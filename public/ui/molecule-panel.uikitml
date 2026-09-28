@@ -1,0 +1,112 @@
+<!--
+  Molecule Lab level panel. Panel, Divider, Button, ButtonIcon and ButtonLabel
+  come from the bundled Horizon kit; RotateCcw and RectangleGoggles are Lucide.
+  Runtime ids: header, level-name, instructions, progress, fact-box, fact-text,
+  restart-button, xr-button.
+-->
+<style>
+  .panel-root {
+    flex-direction: column;
+    width: 360px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: center;
+    padding-top: 16px;
+    padding-bottom: 14px;
+    padding-left: 20px;
+    padding-right: 20px;
+    background-color: #dcebe8;
+  }
+
+  .title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1f2a2a;
+  }
+
+  .level-name {
+    margin-top: 4px;
+    font-size: 18px;
+    font-weight: 500;
+    color: #2e5f58;
+  }
+
+  .body {
+    flex-direction: column;
+    padding-top: 14px;
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+
+  .instructions {
+    font-size: 15px;
+    line-height: 1.35;
+    color: #2b2b2b;
+  }
+
+  .progress {
+    margin-top: 14px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1f2a2a;
+    text-align: center;
+  }
+
+  .fact-box {
+    flex-direction: column;
+    margin-top: 12px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    padding-left: 14px;
+    padding-right: 14px;
+    border-radius: 12px;
+    background-color: #eef7f1;
+  }
+
+  .fact-text {
+    font-size: 15px;
+    line-height: 1.35;
+    color: #1f3a2c;
+  }
+
+  .button {
+    margin-top: 14px;
+    margin-left: 22px;
+    margin-right: 22px;
+    justify-content: center;
+  }
+
+  .last-button {
+    margin-bottom: 20px;
+  }
+</style>
+<Panel class="panel-root">
+  <div id="header" class="header">
+    <div class="title">Molecule Lab</div>
+    <div id="level-name" class="level-name">Level 1: Paracetamol</div>
+  </div>
+  <div class="body">
+    <div id="instructions" class="instructions">
+      Pinch an atom and bring it next to the floating carbon. Correct bonds
+      snap into place.
+    </div>
+    <div id="progress" class="progress">Bonds: 0 / 11</div>
+    <div id="fact-box" class="fact-box" style="display: none">
+      <div id="fact-text" class="fact-text">Fact</div>
+    </div>
+  </div>
+  <Button id="restart-button" class="button last-button">
+    <ButtonIcon>
+      <RotateCcw></RotateCcw>
+    </ButtonIcon>
+    <ButtonLabel>Build again</ButtonLabel>
+  </Button>
+  <Button id="xr-button" class="button last-button">
+    <ButtonIcon>
+      <RectangleGoggles></RectangleGoggles>
+    </ButtonIcon>
+    <ButtonLabel>Enter VR</ButtonLabel>
+  </Button>
+</Panel>

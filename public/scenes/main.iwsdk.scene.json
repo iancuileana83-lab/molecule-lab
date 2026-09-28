@@ -1,0 +1,400 @@
+{
+  "version": "iwsdk.scene.v1",
+  "units": "meters",
+  "components": {
+    "com.iwsdk.components.DomeGradient": {
+      "sky": [
+        0.86,
+        0.91,
+        0.9,
+        1
+      ],
+      "equator": [
+        0.82,
+        0.86,
+        0.85,
+        1
+      ],
+      "ground": [
+        0.7,
+        0.72,
+        0.7,
+        1
+      ],
+      "intensity": 0.8
+    },
+    "com.iwsdk.components.IBLGradient": {
+      "sky": [
+        0.95,
+        0.96,
+        0.95,
+        1
+      ],
+      "equator": [
+        0.8,
+        0.86,
+        0.85,
+        1
+      ],
+      "ground": [
+        0.6,
+        0.6,
+        0.58,
+        1
+      ],
+      "intensity": 0.55
+    }
+  },
+  "resources": {},
+  "authoring": {
+    "views": [
+      {
+        "id": "hero",
+        "role": "hero",
+        "projection": "perspective",
+        "position": [
+          0,
+          1.25,
+          0.35
+        ],
+        "target": [
+          0,
+          0.95,
+          -0.9
+        ],
+        "fov": 70
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "lab-room",
+      "name": "Lab Room",
+      "content": {
+        "type": "asset",
+        "asset": "lab-room"
+      }
+    },
+    {
+      "id": "sun",
+      "name": "Soft Key Light",
+      "transform": {
+        "position": [
+          1.2,
+          2.6,
+          1
+        ],
+        "rotationDeg": [
+          -55,
+          25,
+          0
+        ]
+      },
+      "components": {
+        "com.iwsdk.components.DirectionalLight": {
+          "color": [
+            1,
+            0.97,
+            0.9,
+            1
+          ],
+          "intensity": 0.9,
+          "castShadow": false
+        }
+      }
+    },
+    {
+      "id": "fill",
+      "name": "Fill Light",
+      "components": {
+        "com.iwsdk.components.HemisphereLight": {
+          "skyColor": [
+            0.95,
+            0.97,
+            1,
+            1
+          ],
+          "groundColor": [
+            0.75,
+            0.73,
+            0.7,
+            1
+          ],
+          "intensity": 0.45
+        }
+      }
+    },
+    {
+      "id": "molecule-panel",
+      "name": "Molecule Panel",
+      "content": {
+        "type": "asset",
+        "asset": "molecule-panel"
+      },
+      "transform": {
+        "position": [
+          0.48,
+          1.02,
+          -0.32
+        ],
+        "rotationDeg": [
+          -15,
+          -50,
+          0
+        ],
+        "scale": 0.1
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {},
+        "ScreenSpace": {
+          "top": "20px",
+          "left": "20px",
+          "width": "26vw",
+          "height": "50%"
+        }
+      }
+    },
+    {
+      "id": "atom-seed",
+      "name": "Atom C seed",
+      "content": {
+        "type": "asset",
+        "asset": "atom-carbon"
+      },
+      "transform": {
+        "position": [
+          -0.1625,
+          1.08,
+          -0.5
+        ]
+      },
+      "components": {
+        "Atom": {
+          "element": "C",
+          "slot": 0
+        }
+      }
+    },
+    {
+      "id": "atom-01",
+      "name": "Atom C1",
+      "content": {
+        "type": "asset",
+        "asset": "atom-carbon"
+      },
+      "transform": {
+        "position": [
+          -0.24,
+          0.84,
+          -0.38
+        ]
+      },
+      "components": {
+        "OneHandGrabbable": {},
+        "Atom": {
+          "element": "C",
+          "slot": -1
+        }
+      }
+    },
+    {
+      "id": "atom-02",
+      "name": "Atom O2",
+      "content": {
+        "type": "asset",
+        "asset": "atom-oxygen"
+      },
+      "transform": {
+        "position": [
+          -0.12,
+          0.84,
+          -0.38
+        ]
+      },
+      "components": {
+        "OneHandGrabbable": {},
+        "Atom": {
+          "element": "O",
+          "slot": -1
+        }
+      }
+    },
+    {
+      "id": "atom-03",
+      "name": "Atom C3",
+      "content": {
+        "type": "asset",
+        "asset": "atom-carbon"
+      },
+      "transform": {
+        "position": [
+          0,
+          0.84,
+          -0.38
+        ]
+      },
+      "components": {
+        "OneHandGrabbable": {},
+        "Atom": {
+          "element": "C",
+          "slot": -1
+        }
+      }
+    },
+    {
+      "id": "atom-04",
+      "name": "Atom N4",
+      "content": {
+        "type": "asset",
+        "asset": "atom-nitrogen"
+      },
+      "transform": {
+        "position": [
+          0.12,
+          0.84,
+          -0.38
+        ]
+      },
+      "components": {
+        "OneHandGrabbable": {},
+        "Atom": {
+          "element": "N",
+          "slot": -1
+        }
+      }
+    },
+    {
+      "id": "atom-05",
+      "name": "Atom C5",
+      "content": {
+        "type": "asset",
+        "asset": "atom-carbon"
+      },
+      "transform": {
+        "position": [
+          0.24,
+          0.84,
+          -0.38
+        ]
+      },
+      "components": {
+        "OneHandGrabbable": {},
+        "Atom": {
+          "element": "C",
+          "slot": -1
+        }
+      }
+    },
+    {
+      "id": "atom-06",
+      "name": "Atom C6",
+      "content": {
+        "type": "asset",
+        "asset": "atom-carbon"
+      },
+      "transform": {
+        "position": [
+          -0.24,
+          0.9,
+          -0.5
+        ]
+      },
+      "components": {
+        "OneHandGrabbable": {},
+        "Atom": {
+          "element": "C",
+          "slot": -1
+        }
+      }
+    },
+    {
+      "id": "atom-07",
+      "name": "Atom C7",
+      "content": {
+        "type": "asset",
+        "asset": "atom-carbon"
+      },
+      "transform": {
+        "position": [
+          -0.12,
+          0.9,
+          -0.5
+        ]
+      },
+      "components": {
+        "OneHandGrabbable": {},
+        "Atom": {
+          "element": "C",
+          "slot": -1
+        }
+      }
+    },
+    {
+      "id": "atom-08",
+      "name": "Atom O8",
+      "content": {
+        "type": "asset",
+        "asset": "atom-oxygen"
+      },
+      "transform": {
+        "position": [
+          0,
+          0.9,
+          -0.5
+        ]
+      },
+      "components": {
+        "OneHandGrabbable": {},
+        "Atom": {
+          "element": "O",
+          "slot": -1
+        }
+      }
+    },
+    {
+      "id": "atom-09",
+      "name": "Atom C9",
+      "content": {
+        "type": "asset",
+        "asset": "atom-carbon"
+      },
+      "transform": {
+        "position": [
+          0.12,
+          0.9,
+          -0.5
+        ]
+      },
+      "components": {
+        "OneHandGrabbable": {},
+        "Atom": {
+          "element": "C",
+          "slot": -1
+        }
+      }
+    },
+    {
+      "id": "atom-10",
+      "name": "Atom C10",
+      "content": {
+        "type": "asset",
+        "asset": "atom-carbon"
+      },
+      "transform": {
+        "position": [
+          0.24,
+          0.9,
+          -0.5
+        ]
+      },
+      "components": {
+        "OneHandGrabbable": {},
+        "Atom": {
+          "element": "C",
+          "slot": -1
+        }
+      }
+    }
+  ]
+}
