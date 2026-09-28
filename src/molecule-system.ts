@@ -14,19 +14,27 @@ import {
   VisibilityState,
 } from '@iwsdk/core';
 import { Atom, Bond } from './atom-component.js';
-import { MoleculeLevel, PARACETAMOL } from './levels/paracetamol.js';
+import { LEVELS } from './levels/all-levels.js';
+import type { ElementSymbol, MoleculeLevel } from './levels/types.js';
+import { loadProgress, MoleculeSave, saveProgress } from './molecule-save.js';
 import {
-  clearProgress,
-  loadProgress,
-  MoleculeSave,
-  saveProgress,
-} from './molecule-save.js';
+  carbonAtom,
+  nitrogenAtom,
+  oxygenAtom,
+} from './scene-assets/atoms.scene-asset.js';
 
-/** Metres per angstrom when laying the template out in front of the player. */
+/** Metres per angstrom when laying a template out in front of the player. */
 const SCALE = 0.068;
-/** World position of template (x = X_CENTER, y = 0). The build plane faces +Z. */
-const ORIGIN = new Vector3(0, 1.08, -0.5);
-const X_CENTER = 1.0;
+/** The build plane faces the player (+Z) at this depth, centred on x = 0. */
+const MOLECULE_Z = -0.5;
+/** Lowest atom centre of the molecule; keeps it clear of the atom tray. */
+const MOLECULE_BOTTOM_Y = 0.97;
+/** Two rows of free atoms above the bench, front row first. */
+const TRAY_ROWS = [
+  { y: 0.8, z: -0.36 },
+  { y: 0.85, z: -0.46 },
+];
+const TRAY_SPACING = 0.12;
 /** Release this close to a placed atom counts as "trying to bond" with it. */
 const NEAR_ATOM = 0.12;
 /** Release this close to an open slot snaps there even if far from its partner. */
@@ -44,6 +52,12 @@ const TEXT_START =
 const TEXT_BUILDING =
   'Keep building: bring an atom next to any atom of the molecule. Correct bonds snap into place.';
 
+const PROTOTYPES: Record<ElementSymbol, Object3D> = {
+  C: carbonAtom,
+  N: nitrogenAtom,
+  O: oxygenAtom,
+};
+
 type UIElement = NonNullable<ReturnType<UIKitMLAsset['getElementById']>>;
 
 const GOOD_GLOW = 0x3cff9a;
@@ -54,7 +68,7 @@ export class MoleculeSystem extends createSystem({
   held: { required: [Atom, Grabbed] },
   bonds: { required: [Bond] },
 }) {
-  private level: MoleculeLevel = PARACETAMOL;
+  private levelIndex = 0;
   private slotWorld: Vector3[] = [];
   private filled: boolean[] = [];
   private bondsDone = 0;
@@ -73,23 +87,21 @@ export class MoleculeSystem extends createSystem({
   private hintTime = 0;
   private ui?: {
     header: UIElement;
+    levelName: UIKit.Text;
     progress: UIKit.Text;
     hint: UIKit.Text;
     instructions: UIKit.Text;
     factBox: UIElement;
     factText: UIKit.Text;
+    allDone: UIElement;
+    next: UIElement | null;
   };
 
+  private get level(): MoleculeLevel {
+    return LEVELS[this.levelIndex];
+  }
+
   init(): void {
-    this.slotWorld = this.level.slots.map(
-      (s) =>
-        new Vector3(
-          ORIGIN.x + (s.x - X_CENTER) * SCALE,
-          ORIGIN.y + s.y * SCALE,
-          ORIGIN.z,
-        ),
-    );
-    this.filled = this.level.slots.map(() => false);
     this.bondGeo = new CylinderGeometry(BOND_RADIUS, BOND_RADIUS, 1, 10);
     this.bondMat = new MeshStandardMaterial({ color: 0xd9dde0, roughness: 0.4 });
 
@@ -104,9 +116,80 @@ export class MoleculeSystem extends createSystem({
       () => this.bondGeo.dispose(),
       () => this.bondMat.dispose(),
     );
-    for (const e of this.queries.atoms.entities) this.setupAtom(e);
-    this.restoreProgress();
     this.setupPanel();
+
+    const save = loadProgress();
+    const saved = save ? LEVELS.findIndex((l) => l.id === save.levelId) : -1;
+    this.startLevel(Math.max(saved, 0), saved >= 0 ? save?.placements : undefined);
+  }
+
+  /** Clears the current molecule and lays out a level's atoms. */
+  private startLevel(index: number, placements?: Record<string, number>): void {
+    for (const bond of Array.from(this.queries.bonds.entities)) bond.dispose();
+    for (const atom of Array.from(this.queries.atoms.entities)) {
+      const mat = atom.object3D ? this.atomMaterial(atom.object3D) : undefined;
+      mat?.dispose(); // per-atom clone made in setupAtom
+      atom.dispose();
+    }
+    this.pendingReleases.length = 0;
+    this.hideHint();
+
+    this.levelIndex = index;
+    this.layoutSlots();
+    this.filled = this.level.slots.map(() => false);
+    this.bondsDone = 0;
+
+    // Seed first, then the free atoms in a fixed, element-mixed tray order.
+    this.spawnAtom('C', 0, 0, this.slotWorld[0]);
+    const n = this.level.slots.length;
+    const free = this.level.slots
+      .map((_, i) => i)
+      .filter((i) => i > 0)
+      .sort((a, b) => ((a * 5) % n) - ((b * 5) % n));
+    const perRow = Math.ceil(free.length / TRAY_ROWS.length);
+    free.forEach((slot, k) => {
+      const row = TRAY_ROWS[Math.floor(k / perRow)];
+      const col = k % perRow;
+      const count = Math.min(perRow, free.length - Math.floor(k / perRow) * perRow);
+      this.tmp.set((col - (count - 1) / 2) * TRAY_SPACING, row.y, row.z);
+      this.spawnAtom(this.level.slots[slot].element, k + 1, -1, this.tmp);
+    });
+
+    if (placements) this.restorePlacements(placements);
+    this.persistProgress();
+    this.updatePanel();
+  }
+
+  /** Centres the template horizontally and rests it at MOLECULE_BOTTOM_Y. */
+  private layoutSlots(): void {
+    const xs = this.level.slots.map((s) => s.x);
+    const ys = this.level.slots.map((s) => s.y);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const minY = Math.min(...ys);
+    this.slotWorld = this.level.slots.map(
+      (s) =>
+        new Vector3(
+          (s.x - cx) * SCALE,
+          MOLECULE_BOTTOM_Y + (s.y - minY) * SCALE,
+          MOLECULE_Z,
+        ),
+    );
+  }
+
+  private spawnAtom(
+    element: ElementSymbol,
+    index: number,
+    slot: number,
+    position: Vector3,
+  ): void {
+    const obj = PROTOTYPES[element].clone();
+    // Stable per level and spawn order, so saved placements can find it.
+    obj.name = `Atom ${element}${index}`;
+    obj.position.copy(position);
+    const e = this.world.createTransformEntity(obj);
+    e.addComponent(Atom, { element, slot });
+    if (slot < 0) e.addComponent(OneHandGrabbable);
+    this.setupAtom(e);
   }
 
   private onVisibilityChange(state: VisibilityState): void {
@@ -124,12 +207,10 @@ export class MoleculeSystem extends createSystem({
     }
   }
 
-  private restoreProgress(): void {
-    const save = loadProgress(this.level.id);
-    if (!save) return;
+  private restorePlacements(placements: Record<string, number>): void {
     const bySlot: Array<[Entity, number]> = [];
     for (const e of this.queries.atoms.entities) {
-      const slot = save.placements[e.object3D?.name ?? ''];
+      const slot = placements[e.object3D?.name ?? ''];
       if (slot === undefined || (e.getValue(Atom, 'slot') ?? -1) >= 0) continue;
       const target = this.level.slots[slot];
       if (!target || this.filled[slot]) continue;
@@ -143,14 +224,14 @@ export class MoleculeSystem extends createSystem({
   }
 
   private persistProgress(): void {
-    const save: MoleculeSave = { placements: {} };
+    const save: MoleculeSave = { levelId: this.level.id, placements: {} };
     for (const e of this.queries.atoms.entities) {
       const slot = e.getValue(Atom, 'slot') ?? -1;
       const name = e.object3D?.name;
-      // Slot 0 is the authored seed; it never needs saving.
+      // Slot 0 is the seed; it is always placed and never needs saving.
       if (slot > 0 && name) save.placements[name] = slot;
     }
-    saveProgress(this.level.id, save);
+    saveProgress(save);
   }
 
   private setupPanel(): void {
@@ -160,33 +241,68 @@ export class MoleculeSystem extends createSystem({
       return;
     }
     const header = panel.getElementById('header');
+    const levelName = panel.getElementById<UIKit.Text>('level-name');
     const progress = panel.getElementById<UIKit.Text>('progress');
     const hint = panel.getElementById<UIKit.Text>('hint');
     const instructions = panel.getElementById<UIKit.Text>('instructions');
     const factBox = panel.getElementById('fact-box');
     const factText = panel.getElementById<UIKit.Text>('fact-text');
-    const restart = panel.getElementById('restart-button');
-    if (!header || !progress || !hint || !instructions || !factBox || !factText)
+    const allDone = panel.getElementById('all-done');
+    if (
+      !header ||
+      !levelName ||
+      !progress ||
+      !hint ||
+      !instructions ||
+      !factBox ||
+      !factText ||
+      !allDone
+    )
       return;
-    this.ui = { header, progress, hint, instructions, factBox, factText };
-    factText.setProperties({ text: this.level.fact });
-    if (restart) {
-      restart.name = 'restart-button';
-      const onRestart = () => this.resetLevel();
-      restart.addEventListener('click', onRestart);
-      this.cleanupFuncs.push(() =>
-        restart.removeEventListener('click', onRestart),
-      );
-    }
-    this.updatePanel();
+    const next = panel.getElementById('next-button');
+    this.ui = {
+      header,
+      levelName,
+      progress,
+      hint,
+      instructions,
+      factBox,
+      factText,
+      allDone,
+      next,
+    };
+    this.bindButton(panel.getElementById('restart-button'), 'restart-button', () =>
+      this.startLevel(this.levelIndex),
+    );
+    this.bindButton(next, 'next-button', () => {
+      if (this.levelIndex < LEVELS.length - 1) this.startLevel(this.levelIndex + 1);
+    });
+  }
+
+  private bindButton(
+    button: UIElement | null,
+    name: string,
+    onClick: () => void,
+  ): void {
+    if (!button) return;
+    button.name = name;
+    button.addEventListener('click', onClick);
+    this.cleanupFuncs.push(() => button.removeEventListener('click', onClick));
   }
 
   private updatePanel(): void {
     if (!this.ui) return;
     const total = this.level.bonds.length;
     const done = this.bondsDone === total;
+    const hasNext = this.levelIndex < LEVELS.length - 1;
+    this.ui.levelName.setProperties({
+      text: `Level ${this.levelIndex + 1}: ${this.level.name}`,
+    });
+    this.ui.factText.setProperties({ text: this.level.fact });
     this.ui.progress.setProperties({
-      text: done ? `${this.level.name} complete!` : `Bonds: ${this.bondsDone} / ${total}`,
+      text: done
+        ? `${this.level.name} complete!`
+        : `Bonds: ${this.bondsDone} / ${total}`,
     });
     this.ui.header.setProperties({
       backgroundColor: done ? '#9fe0b8' : '#dcebe8',
@@ -196,6 +312,8 @@ export class MoleculeSystem extends createSystem({
       text: this.bondsDone === 0 ? TEXT_START : TEXT_BUILDING,
     });
     this.ui.factBox.setProperties({ display: done ? 'flex' : 'none' });
+    this.ui.allDone.setProperties({ display: done && !hasNext ? 'flex' : 'none' });
+    this.ui.next?.setProperties({ display: done && hasNext ? 'flex' : 'none' });
   }
 
   private showHint(text: string): void {
@@ -207,24 +325,6 @@ export class MoleculeSystem extends createSystem({
   private hideHint(): void {
     this.hintTime = 0;
     this.ui?.hint.setProperties({ display: 'none' });
-  }
-
-  /** Returns every non-seed atom home and clears the bonds. */
-  private resetLevel(): void {
-    for (const bond of Array.from(this.queries.bonds.entities)) bond.dispose();
-    for (const e of this.queries.atoms.entities) {
-      if ((e.getValue(Atom, 'slot') ?? -1) === 0) continue;
-      e.setValue(Atom, 'slot', -1);
-      if (!e.hasComponent(OneHandGrabbable)) e.addComponent(OneHandGrabbable);
-      const home = e.getVectorView(Atom, 'home');
-      this.tmp2.set(home[0], home[1], home[2]);
-      this.startTween(e, this.tmp2, RETURN_TIME);
-    }
-    this.filled = this.level.slots.map((_, s) => s === 0);
-    this.bondsDone = 0;
-    clearProgress(this.level.id);
-    this.hideHint();
-    this.updatePanel();
   }
 
   update(delta: number): void {

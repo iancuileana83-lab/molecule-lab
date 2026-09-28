@@ -1,8 +1,9 @@
 <!--
   Molecule Lab level panel. Panel, Divider, Button, ButtonIcon and ButtonLabel
-  come from the bundled Horizon kit; RotateCcw and RectangleGoggles are Lucide.
-  Runtime ids: header, level-name, instructions, progress, hint, fact-box,
-  fact-text, restart-button, xr-button.
+  come from the bundled Horizon kit; ArrowRight, RotateCcw and
+  RectangleGoggles are Lucide. Runtime ids: header, level-name, instructions,
+  progress, hint, fact-box, fact-text, all-done, next-button, restart-button,
+  xr-button.
 -->
 <style>
   .panel-root {
@@ -85,6 +86,14 @@
     color: #1f3a2c;
   }
 
+  .all-done {
+    margin-top: 12px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #2e5f58;
+    text-align: center;
+  }
+
   .button {
     margin-top: 14px;
     margin-left: 22px;
@@ -111,7 +120,16 @@
     <div id="fact-box" class="fact-box" style="display: none">
       <div id="fact-text" class="fact-text">Fact</div>
     </div>
+    <div id="all-done" class="all-done" style="display: none">
+      You built every molecule!
+    </div>
   </div>
+  <Button id="next-button" class="button" style="display: none">
+    <ButtonLabel>Next molecule</ButtonLabel>
+    <ButtonIcon>
+      <ArrowRight></ArrowRight>
+    </ButtonIcon>
+  </Button>
   <Button id="restart-button" class="button last-button">
     <ButtonIcon>
       <RotateCcw></RotateCcw>

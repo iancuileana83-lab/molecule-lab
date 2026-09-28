@@ -1,22 +1,9 @@
-/**
- * Paracetamol (acetaminophen) heavy-atom template, hydrogens implicit.
- * Coordinates are a flat 2D layout in angstroms; the game scales them into
- * a vertical plane in front of the player. Slot 0 is the pre-placed seed.
- */
-export type ElementSymbol = 'C' | 'N' | 'O';
-
-export interface MoleculeLevel {
-  id: string;
-  name: string;
-  slots: Array<{ element: ElementSymbol; x: number; y: number }>;
-  /** [slotA, slotB, bondOrder] */
-  bonds: Array<[number, number, 1 | 2]>;
-  fact: string;
-}
+import type { MoleculeLevel } from './types.js';
 
 const R = 1.39; // aromatic C–C
 const H = R * Math.sin(Math.PI / 3);
 
+/** Paracetamol (acetaminophen): 11 heavy atoms (8 C, 1 N, 2 O), 11 bonds. */
 export const PARACETAMOL: MoleculeLevel = {
   id: 'paracetamol',
   name: 'Paracetamol',
@@ -46,5 +33,5 @@ export const PARACETAMOL: MoleculeLevel = {
     [8, 9, 2],
     [8, 10, 1],
   ],
-  fact: 'Paracetamol relieves pain and lowers fever. It has been used since the 1950s and is on the WHO List of Essential Medicines.',
+  fact: 'Paracetamol (called acetaminophen in the US) relieves pain and reduces fever. It became widely used in the 1950s and is on the WHO List of Essential Medicines.',
 };
