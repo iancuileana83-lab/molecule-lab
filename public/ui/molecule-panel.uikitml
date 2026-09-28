@@ -1,8 +1,8 @@
 <!--
   Molecule Lab level panel. Panel, Divider, Button, ButtonIcon and ButtonLabel
   come from the bundled Horizon kit; RotateCcw and RectangleGoggles are Lucide.
-  Runtime ids: header, level-name, instructions, progress, fact-box, fact-text,
-  restart-button, xr-button.
+  Runtime ids: header, level-name, instructions, progress, hint, fact-box,
+  fact-text, restart-button, xr-button.
 -->
 <style>
   .panel-root {
@@ -54,6 +54,20 @@
     text-align: center;
   }
 
+  .hint {
+    margin-top: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+    border-radius: 10px;
+    background-color: #fbe3df;
+    font-size: 15px;
+    line-height: 1.3;
+    color: #8a1f14;
+    text-align: center;
+  }
+
   .fact-box {
     flex-direction: column;
     margin-top: 12px;
@@ -93,6 +107,7 @@
       snap into place.
     </div>
     <div id="progress" class="progress">Bonds: 0 / 11</div>
+    <div id="hint" class="hint" style="display: none">Hint</div>
     <div id="fact-box" class="fact-box" style="display: none">
       <div id="fact-text" class="fact-text">Fact</div>
     </div>

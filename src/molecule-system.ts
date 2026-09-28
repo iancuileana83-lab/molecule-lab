@@ -3,6 +3,7 @@ import {
   CylinderGeometry,
   Entity,
   Grabbed,
+  GrabSystem,
   Mesh,
   MeshStandardMaterial,
   Object3D,
@@ -10,9 +11,16 @@ import {
   UIKit,
   UIKitMLAsset,
   Vector3,
+  VisibilityState,
 } from '@iwsdk/core';
 import { Atom, Bond } from './atom-component.js';
 import { MoleculeLevel, PARACETAMOL } from './levels/paracetamol.js';
+import {
+  clearProgress,
+  loadProgress,
+  MoleculeSave,
+  saveProgress,
+} from './molecule-save.js';
 
 /** Metres per angstrom when laying the template out in front of the player. */
 const SCALE = 0.068;
@@ -28,6 +36,13 @@ const RETURN_TIME = 0.45;
 const FLASH_TIME = 0.5;
 const BOND_RADIUS = 0.007;
 const DOUBLE_BOND_OFFSET = 0.012;
+const HINT_TIME = 4;
+const RELEASE_GRACE = 0.5;
+
+const TEXT_START =
+  'Pinch an atom and bring it next to the floating carbon. Correct bonds snap into place.';
+const TEXT_BUILDING =
+  'Keep building: bring an atom next to any atom of the molecule. Correct bonds snap into place.';
 
 type UIElement = NonNullable<ReturnType<UIKitMLAsset['getElementById']>>;
 
@@ -49,10 +64,18 @@ export class MoleculeSystem extends createSystem({
   private tmp2 = new Vector3();
   private up = new Vector3(0, 1, 0);
   private planeNormal = new Vector3(0, 0, 1);
+  /** True while the headset shows a system overlay or the app is hidden. */
+  private paused = false;
+  /** Releases are judged one frame later so an exit/pause can be told apart. */
+  private pendingReleases: Entity[] = [];
+  /** Seconds after a pause/exit/resume during which releases are set aside. */
+  private releaseGrace = 0;
+  private hintTime = 0;
   private ui?: {
     header: UIElement;
     progress: UIKit.Text;
-    instructions: UIElement;
+    hint: UIKit.Text;
+    instructions: UIKit.Text;
     factBox: UIElement;
     factText: UIKit.Text;
   };
@@ -71,15 +94,63 @@ export class MoleculeSystem extends createSystem({
     this.bondMat = new MeshStandardMaterial({ color: 0xd9dde0, roughness: 0.4 });
 
     const setup = (e: Entity) => this.setupAtom(e);
-    const release = (e: Entity) => this.onRelease(e);
+    const release = (e: Entity) => this.pendingReleases.push(e);
     this.cleanupFuncs.push(
       this.queries.atoms.subscribe('qualify', setup),
       this.queries.held.subscribe('disqualify', release),
+      this.world.visibilityState.subscribe((state) =>
+        this.onVisibilityChange(state),
+      ),
       () => this.bondGeo.dispose(),
       () => this.bondMat.dispose(),
     );
     for (const e of this.queries.atoms.entities) this.setupAtom(e);
+    this.restoreProgress();
     this.setupPanel();
+  }
+
+  private onVisibilityChange(state: VisibilityState): void {
+    this.paused =
+      state === VisibilityState.VisibleBlurred ||
+      state === VisibilityState.Hidden;
+    // Hands vanish and reappear around a pause; never judge those releases.
+    this.releaseGrace = RELEASE_GRACE;
+    if (state === VisibilityState.Visible) return;
+    // Leaving active play: let go of anything in hand. The release is then
+    // handled as "set aside", never judged as a bond attempt.
+    const grab = this.world.getSystem(GrabSystem);
+    for (const e of Array.from(this.queries.held.entities)) {
+      grab?.forceRelease(e);
+    }
+  }
+
+  private restoreProgress(): void {
+    const save = loadProgress(this.level.id);
+    if (!save) return;
+    const bySlot: Array<[Entity, number]> = [];
+    for (const e of this.queries.atoms.entities) {
+      const slot = save.placements[e.object3D?.name ?? ''];
+      if (slot === undefined || (e.getValue(Atom, 'slot') ?? -1) >= 0) continue;
+      const target = this.level.slots[slot];
+      if (!target || this.filled[slot]) continue;
+      if (target.element !== e.getValue(Atom, 'element')) continue;
+      bySlot.push([e, slot]);
+      this.filled[slot] = true; // reserve so duplicates in a bad save are skipped
+    }
+    // Release the reservations first so each bond is spawned exactly once.
+    for (const [, slot] of bySlot) this.filled[slot] = false;
+    for (const [e, slot] of bySlot) this.place(e, slot, true);
+  }
+
+  private persistProgress(): void {
+    const save: MoleculeSave = { placements: {} };
+    for (const e of this.queries.atoms.entities) {
+      const slot = e.getValue(Atom, 'slot') ?? -1;
+      const name = e.object3D?.name;
+      // Slot 0 is the authored seed; it never needs saving.
+      if (slot > 0 && name) save.placements[name] = slot;
+    }
+    saveProgress(this.level.id, save);
   }
 
   private setupPanel(): void {
@@ -90,12 +161,14 @@ export class MoleculeSystem extends createSystem({
     }
     const header = panel.getElementById('header');
     const progress = panel.getElementById<UIKit.Text>('progress');
-    const instructions = panel.getElementById('instructions');
+    const hint = panel.getElementById<UIKit.Text>('hint');
+    const instructions = panel.getElementById<UIKit.Text>('instructions');
     const factBox = panel.getElementById('fact-box');
     const factText = panel.getElementById<UIKit.Text>('fact-text');
     const restart = panel.getElementById('restart-button');
-    if (!header || !progress || !instructions || !factBox || !factText) return;
-    this.ui = { header, progress, instructions, factBox, factText };
+    if (!header || !progress || !hint || !instructions || !factBox || !factText)
+      return;
+    this.ui = { header, progress, hint, instructions, factBox, factText };
     factText.setProperties({ text: this.level.fact });
     if (restart) {
       restart.name = 'restart-button';
@@ -118,8 +191,22 @@ export class MoleculeSystem extends createSystem({
     this.ui.header.setProperties({
       backgroundColor: done ? '#9fe0b8' : '#dcebe8',
     });
-    this.ui.instructions.setProperties({ display: done ? 'none' : 'flex' });
+    this.ui.instructions.setProperties({
+      display: done ? 'none' : 'flex',
+      text: this.bondsDone === 0 ? TEXT_START : TEXT_BUILDING,
+    });
     this.ui.factBox.setProperties({ display: done ? 'flex' : 'none' });
+  }
+
+  private showHint(text: string): void {
+    if (!this.ui) return;
+    this.ui.hint.setProperties({ text, display: 'flex' });
+    this.hintTime = HINT_TIME;
+  }
+
+  private hideHint(): void {
+    this.hintTime = 0;
+    this.ui?.hint.setProperties({ display: 'none' });
   }
 
   /** Returns every non-seed atom home and clears the bonds. */
@@ -135,10 +222,34 @@ export class MoleculeSystem extends createSystem({
     }
     this.filled = this.level.slots.map((_, s) => s === 0);
     this.bondsDone = 0;
+    clearProgress(this.level.id);
+    this.hideHint();
     this.updatePanel();
   }
 
   update(delta: number): void {
+    if (this.pendingReleases.length > 0) {
+      const active =
+        !this.paused &&
+        this.releaseGrace <= 0 &&
+        this.world.visibilityState.peek() === VisibilityState.Visible;
+      for (const e of this.pendingReleases) {
+        if (!e.active || e.hasComponent(Grabbed)) continue;
+        if (active) this.onRelease(e);
+        else this.setAside(e);
+      }
+      this.pendingReleases.length = 0;
+    }
+
+    // Frozen while paused: tweens, flashes and the hint resume on return.
+    if (this.paused) return;
+    if (this.releaseGrace > 0) this.releaseGrace -= delta;
+
+    if (this.hintTime > 0) {
+      this.hintTime -= delta;
+      if (this.hintTime <= 0) this.hideHint();
+    }
+
     for (const e of this.queries.atoms.entities) {
       const obj = e.object3D;
       if (!obj) continue;
@@ -236,12 +347,18 @@ export class MoleculeSystem extends createSystem({
     else if (nearSlot >= 0) this.reject(e);
   }
 
-  private place(e: Entity, slot: number): void {
+  /** `restoring` places instantly and quietly, without saving again. */
+  private place(e: Entity, slot: number, restoring = false): void {
     e.setValue(Atom, 'slot', slot);
     this.filled[slot] = true;
     if (e.hasComponent(OneHandGrabbable)) e.removeComponent(OneHandGrabbable);
-    this.startTween(e, this.slotWorld[slot], SNAP_TIME);
-    this.flash(e, true);
+    if (restoring && e.object3D) {
+      this.setWorldPosition(e.object3D, this.slotWorld[slot]);
+    } else {
+      this.startTween(e, this.slotWorld[slot], SNAP_TIME);
+      this.flash(e, true);
+      this.hideHint();
+    }
 
     for (const [a, b, order] of this.level.bonds) {
       const other = a === slot ? b : b === slot ? a : -1;
@@ -251,18 +368,32 @@ export class MoleculeSystem extends createSystem({
       }
     }
 
-    if (this.bondsDone === this.level.bonds.length) {
+    if (!restoring && this.bondsDone === this.level.bonds.length) {
       for (const atom of this.queries.atoms.entities) this.flash(atom, true);
       console.info(`[Molecule Lab] ${this.level.name} complete!`);
     }
+    if (!restoring) this.persistProgress();
     this.updatePanel();
   }
 
   private reject(e: Entity): void {
+    this.returnHome(e);
+    this.flash(e, false);
+    this.showHint(
+      `That bond is not in ${this.level.name.toLowerCase()}. Try another spot.`,
+    );
+  }
+
+  /** Quietly sends a free atom home, e.g. when play is paused mid-grab. */
+  private setAside(e: Entity): void {
+    if ((e.getValue(Atom, 'slot') ?? -1) >= 0) return;
+    this.returnHome(e);
+  }
+
+  private returnHome(e: Entity): void {
     const home = e.getVectorView(Atom, 'home');
     this.tmp2.set(home[0], home[1], home[2]);
     this.startTween(e, this.tmp2, RETURN_TIME);
-    this.flash(e, false);
   }
 
   private spawnBond(a: Vector3, b: Vector3, order: 1 | 2): void {
