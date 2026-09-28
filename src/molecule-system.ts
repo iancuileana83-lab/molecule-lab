@@ -95,6 +95,7 @@ export class MoleculeSystem extends createSystem({
     factText: UIKit.Text;
     allDone: UIElement;
     next: UIElement | null;
+    playAgain: UIElement | null;
   };
 
   private get level(): MoleculeLevel {
@@ -260,7 +261,9 @@ export class MoleculeSystem extends createSystem({
     )
       return;
     const next = panel.getElementById('next-button');
+    const playAgain = panel.getElementById('play-again-button');
     this.ui = {
+      playAgain,
       header,
       levelName,
       progress,
@@ -277,6 +280,7 @@ export class MoleculeSystem extends createSystem({
     this.bindButton(next, 'next-button', () => {
       if (this.levelIndex < LEVELS.length - 1) this.startLevel(this.levelIndex + 1);
     });
+    this.bindButton(playAgain, 'play-again-button', () => this.startLevel(0));
   }
 
   private bindButton(
@@ -314,6 +318,9 @@ export class MoleculeSystem extends createSystem({
     this.ui.factBox.setProperties({ display: done ? 'flex' : 'none' });
     this.ui.allDone.setProperties({ display: done && !hasNext ? 'flex' : 'none' });
     this.ui.next?.setProperties({ display: done && hasNext ? 'flex' : 'none' });
+    this.ui.playAgain?.setProperties({
+      display: done && !hasNext ? 'flex' : 'none',
+    });
   }
 
   private showHint(text: string): void {

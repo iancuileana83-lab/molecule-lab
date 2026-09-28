@@ -1,9 +1,9 @@
 <!--
   Molecule Lab level panel. Panel, Divider, Button, ButtonIcon and ButtonLabel
-  come from the bundled Horizon kit; ArrowRight, RotateCcw and
+  come from the bundled Horizon kit; ArrowRight, ArrowLeft, RotateCcw and
   RectangleGoggles are Lucide. Runtime ids: header, level-name, instructions,
-  progress, hint, fact-box, fact-text, all-done, next-button, restart-button,
-  xr-button.
+  progress, hint, fact-box, fact-text, all-done, next-button,
+  play-again-button, restart-button, xr-button.
 -->
 <style>
   .panel-root {
@@ -129,6 +129,12 @@
     <ButtonIcon>
       <ArrowRight></ArrowRight>
     </ButtonIcon>
+  </Button>
+  <Button id="play-again-button" class="button" style="display: none">
+    <ButtonIcon>
+      <ArrowLeft></ArrowLeft>
+    </ButtonIcon>
+    <ButtonLabel>Play again from level 1</ButtonLabel>
   </Button>
   <Button id="restart-button" class="button last-button">
     <ButtonIcon>
