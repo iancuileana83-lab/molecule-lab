@@ -16,6 +16,8 @@ import {
   VisibilityState,
 } from '@iwsdk/core';
 import { Atom, Bond } from './atom-component.js';
+import { AtomLabels } from './atom-labels.js';
+import { BurstParticles } from './burst-particles.js';
 import { LEVELS } from './levels/all-levels.js';
 import type { ElementSymbol, MoleculeLevel } from './levels/types.js';
 import { MoleculeGuide } from './molecule-guide.js';
@@ -23,14 +25,17 @@ import {
   loadGuidePref,
   loadProgress,
   MoleculeSave,
+  loadSoundPref,
   saveGuidePref,
   saveProgress,
+  saveSoundPref,
 } from './molecule-save.js';
 import {
   carbonAtom,
   nitrogenAtom,
   oxygenAtom,
 } from './scene-assets/atoms.scene-asset.js';
+import { SoundFx } from './sound-fx.js';
 
 /** Metres per angstrom when laying a template out in front of the player. */
 const SCALE = 0.068;
@@ -123,6 +128,9 @@ export class MoleculeSystem extends createSystem({
   private guideOn = true;
   /** Atoms placed this level, not counting the seed. */
   private placedCount = 0;
+  private sfx = new SoundFx();
+  private labels!: AtomLabels;
+  private burst!: BurstParticles;
   private ui?: {
     header: UIElement;
     levelName: UIKit.Text;
@@ -134,6 +142,7 @@ export class MoleculeSystem extends createSystem({
     allDone: UIElement;
     next: UIElement | null;
     guideLabel: UIKit.Text | null;
+    soundLabel: UIKit.Text | null;
     playAgain: UIElement | null;
   };
 
@@ -172,8 +181,15 @@ export class MoleculeSystem extends createSystem({
       () => this.bondGeo.dispose(),
       () => this.bondMat.dispose(),
       () => this.guide.dispose(),
+      () => this.labels.dispose(),
+      () => this.burst.dispose(),
+      () => this.sfx.dispose(),
     );
     this.guideOn = loadGuidePref();
+    this.sfx.muted = !loadSoundPref();
+    this.labels = new AtomLabels();
+    this.burst = new BurstParticles();
+    this.world.createTransformEntity(this.burst.points);
     this.world.createTransformEntity(this.guide.root);
     this.setupPanel();
 
@@ -198,7 +214,7 @@ export class MoleculeSystem extends createSystem({
     this.filled = this.level.slots.map(() => false);
     this.bondsDone = 0;
     this.placedCount = 0;
-    this.guide.build(this.level, this.slotWorld);
+    this.guide.build(this.level, this.slotWorld, this.labels);
 
     // Seed first, then the free atoms in a fixed, element-mixed tray order.
     this.seed = this.spawnAtom('C', 0, 0, this.slotWorld[0]);
@@ -252,6 +268,7 @@ export class MoleculeSystem extends createSystem({
     const obj = PROTOTYPES[element].clone();
     // Stable per level and spawn order, so saved placements can find it.
     obj.name = `Atom ${element}${index}`;
+    obj.add(this.labels.create(element));
     obj.position.copy(position);
     const e = this.world.createTransformEntity(obj);
     e.addComponent(Atom, { element, slot });
@@ -367,12 +384,16 @@ export class MoleculeSystem extends createSystem({
       allDone,
       next,
       guideLabel: panel.getElementById<UIKit.Text>('guide-label'),
+      soundLabel: panel.getElementById<UIKit.Text>('sound-label'),
     };
     this.bindButton(panel.getElementById('restart-button'), 'restart-button', () =>
       this.startLevel(this.levelIndex),
     );
     this.bindButton(panel.getElementById('guide-button'), 'guide-button', () =>
       this.setGuide(!this.guideOn),
+    );
+    this.bindButton(panel.getElementById('sound-button'), 'sound-button', () =>
+      this.setSound(this.sfx.muted),
     );
     this.bindButton(next, 'next-button', () => {
       if (this.levelIndex < LEVELS.length - 1) this.startLevel(this.levelIndex + 1);
@@ -389,6 +410,13 @@ export class MoleculeSystem extends createSystem({
     button.name = name;
     button.addEventListener('click', onClick);
     this.cleanupFuncs.push(() => button.removeEventListener('click', onClick));
+  }
+
+  private setSound(on: boolean): void {
+    this.sfx.muted = !on;
+    saveSoundPref(on);
+    this.updatePanel();
+    this.sfx.snap(0.5); // audible confirmation when turning sound back on
   }
 
   private setGuide(on: boolean): void {
@@ -431,6 +459,10 @@ export class MoleculeSystem extends createSystem({
       text: this.guideOn ? 'Hide guide' : 'Show guide',
       fontSize: 19,
     });
+    this.ui.soundLabel?.setProperties({
+      text: this.sfx.muted ? 'Unmute sound' : 'Mute sound',
+      fontSize: 19,
+    });
     this.ui.factBox.setProperties({ display: done ? 'flex' : 'none' });
     this.ui.allDone.setProperties({ display: done && !hasNext ? 'flex' : 'none' });
     this.ui.next?.setProperties({ display: done && hasNext ? 'flex' : 'none' });
@@ -467,6 +499,7 @@ export class MoleculeSystem extends createSystem({
     // Frozen while paused: tweens, flashes and the hint resume on return.
     if (this.paused) return;
     if (this.releaseGrace > 0) this.releaseGrace -= delta;
+    this.burst.update(delta);
 
     this.updateSeedCue(delta);
 
@@ -628,9 +661,14 @@ export class MoleculeSystem extends createSystem({
       }
     }
 
-    if (!restoring && this.bondsDone === this.level.bonds.length) {
+    const complete = this.bondsDone === this.level.bonds.length;
+    if (!restoring && complete) {
       for (const atom of this.queries.atoms.entities) this.flash(atom, true);
+      this.sfx.complete();
+      this.burst.start(this.moleculeCenter());
       console.info(`[Molecule Lab] ${this.level.name} complete!`);
+    } else if (!restoring) {
+      this.sfx.snap(this.placedCount / (this.level.slots.length - 1));
     }
     if (!restoring) this.persistProgress();
     this.guide.update(this.filled, this.guideOn);
@@ -640,7 +678,15 @@ export class MoleculeSystem extends createSystem({
   private reject(e: Entity, hint: string): void {
     this.returnHome(e);
     this.flash(e, false);
+    this.sfx.error();
     this.showHint(hint);
+  }
+
+  /** Average of the slot positions; reuses tmp2. */
+  private moleculeCenter(): Vector3 {
+    this.tmp2.set(0, 0, 0);
+    for (const p of this.slotWorld) this.tmp2.add(p);
+    return this.tmp2.multiplyScalar(1 / this.slotWorld.length);
   }
 
   /** Quietly sends a free atom home, e.g. when play is paused mid-grab. */

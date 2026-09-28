@@ -6,6 +6,7 @@ import {
   SphereGeometry,
   Vector3,
 } from '@iwsdk/core';
+import type { AtomLabels } from './atom-labels.js';
 import type { ElementSymbol, MoleculeLevel } from './levels/types.js';
 import { ATOM_RADIUS } from './scene-assets/atoms.scene-asset.js';
 
@@ -62,12 +63,13 @@ export class MoleculeGuide {
   }
 
   /** Rebuilds spots and lines for a level. `slotWorld` are world positions. */
-  build(level: MoleculeLevel, slotWorld: Vector3[]): void {
+  build(level: MoleculeLevel, slotWorld: Vector3[], labels?: AtomLabels): void {
     this.root.clear();
     this.spots = level.slots.map((s, i) => {
       const m = new Mesh(this.spotGeo[s.element], this.spotMat[s.element]);
       m.name = `GuideSpot${i}`;
       m.position.copy(slotWorld[i]);
+      if (labels) m.add(labels.create(s.element, true));
       this.root.add(m);
       return m;
     });

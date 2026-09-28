@@ -28,6 +28,24 @@ export function loadProgress(): MoleculeSave | null {
 }
 
 const GUIDE_KEY = 'molecule-lab:guide:v1';
+const SOUND_KEY = 'molecule-lab:sound:v1';
+
+/** Whether sound effects play; on unless muted. */
+export function loadSoundPref(): boolean {
+  try {
+    return localStorage.getItem(SOUND_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+export function saveSoundPref(on: boolean): void {
+  try {
+    localStorage.setItem(SOUND_KEY, on ? 'on' : 'off');
+  } catch {
+    // Preference simply is not persisted on this device.
+  }
+}
 
 /** Whether the target-molecule guide is shown; on unless turned off. */
 export function loadGuidePref(): boolean {

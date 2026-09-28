@@ -1,9 +1,10 @@
 <!--
   Molecule Lab level panel. Panel, Divider, Button, ButtonIcon and ButtonLabel
   come from the bundled Horizon kit; ArrowRight, ArrowLeft, Eye, RotateCcw
-  and RectangleGoggles are Lucide. Runtime ids: header, level-name,
+  Volume2 and RectangleGoggles are Lucide. Runtime ids: header, level-name,
   instructions, progress, hint, fact-box, fact-text, all-done, next-button,
-  play-again-button, guide-button, guide-label, restart-button, xr-button.
+  play-again-button, guide-button, guide-label, sound-button, sound-label,
+  restart-button, xr-button.
 -->
 <style>
   .panel-root {
@@ -111,7 +112,6 @@
     margin-top: 14px;
     margin-left: 22px;
     margin-right: 22px;
-    margin-bottom: 20px;
   }
 
   .row-button {
@@ -161,13 +161,19 @@
       </ButtonIcon>
       <ButtonLabel id="guide-label" class="button-label">Hide guide</ButtonLabel>
     </Button>
-    <Button id="restart-button" class="row-button">
+    <Button id="sound-button" class="row-button">
       <ButtonIcon>
-        <RotateCcw></RotateCcw>
+        <Volume2></Volume2>
       </ButtonIcon>
-      <ButtonLabel class="button-label">Build again</ButtonLabel>
+      <ButtonLabel id="sound-label" class="button-label">Mute sound</ButtonLabel>
     </Button>
   </div>
+  <Button id="restart-button" class="button last-button">
+    <ButtonIcon>
+      <RotateCcw></RotateCcw>
+    </ButtonIcon>
+    <ButtonLabel class="button-label">Build again</ButtonLabel>
+  </Button>
   <Button id="xr-button" class="button last-button">
     <ButtonIcon>
       <RectangleGoggles></RectangleGoggles>
