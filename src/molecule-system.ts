@@ -36,7 +36,7 @@ const TRAY_ROWS = [
   { y: 0.8, z: -0.36 },
   { y: 0.85, z: -0.46 },
 ];
-const TRAY_SPACING = 0.12;
+const TRAY_SPACING = 0.11;
 /** Release this close to a placed atom counts as "trying to bond" with it. */
 const NEAR_ATOM = 0.12;
 /** Release this close to an open slot snaps there even if far from its partner. */
