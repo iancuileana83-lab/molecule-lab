@@ -27,6 +27,25 @@ export function loadProgress(): MoleculeSave | null {
   }
 }
 
+const GUIDE_KEY = 'molecule-lab:guide:v1';
+
+/** Whether the target-molecule guide is shown; on unless turned off. */
+export function loadGuidePref(): boolean {
+  try {
+    return localStorage.getItem(GUIDE_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+export function saveGuidePref(on: boolean): void {
+  try {
+    localStorage.setItem(GUIDE_KEY, on ? 'on' : 'off');
+  } catch {
+    // Preference simply is not persisted on this device.
+  }
+}
+
 export function saveProgress(save: MoleculeSave): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(save));

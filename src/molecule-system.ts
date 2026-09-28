@@ -18,7 +18,14 @@ import {
 import { Atom, Bond } from './atom-component.js';
 import { LEVELS } from './levels/all-levels.js';
 import type { ElementSymbol, MoleculeLevel } from './levels/types.js';
-import { loadProgress, MoleculeSave, saveProgress } from './molecule-save.js';
+import { MoleculeGuide } from './molecule-guide.js';
+import {
+  loadGuidePref,
+  loadProgress,
+  MoleculeSave,
+  saveGuidePref,
+  saveProgress,
+} from './molecule-save.js';
 import {
   carbonAtom,
   nitrogenAtom,
@@ -47,12 +54,23 @@ const FLASH_TIME = 0.5;
 const BOND_RADIUS = 0.007;
 const DOUBLE_BOND_OFFSET = 0.012;
 const HINT_TIME = 4;
+/** With the guide on, a release this close to an empty spot targets it. */
+const GUIDE_CAPTURE = 0.06;
 const RELEASE_GRACE = 0.5;
 
 const TEXT_START =
   'Pinch an atom and bring it next to the floating carbon. Correct bonds snap into place.';
 const TEXT_BUILDING =
   'Keep building: bring an atom next to any atom of the molecule. Correct bonds snap into place.';
+
+const TEXT_GUIDE =
+  'Pinch an atom and place it on the faint spot of the same color.';
+
+const ELEMENT_LABEL: Record<ElementSymbol, string> = {
+  C: 'carbon (grey)',
+  N: 'nitrogen (blue)',
+  O: 'oxygen (red)',
+};
 
 const PROTOTYPES: Record<ElementSymbol, Object3D> = {
   C: carbonAtom,
@@ -101,6 +119,10 @@ export class MoleculeSystem extends createSystem({
   /** 1 = start-here cue fully shown, 0 = hidden. Fades between the two. */
   private seedCue = 0;
   private seedCueClock = 0;
+  private guide = new MoleculeGuide();
+  private guideOn = true;
+  /** Atoms placed this level, not counting the seed. */
+  private placedCount = 0;
   private ui?: {
     header: UIElement;
     levelName: UIKit.Text;
@@ -111,6 +133,7 @@ export class MoleculeSystem extends createSystem({
     factText: UIKit.Text;
     allDone: UIElement;
     next: UIElement | null;
+    guideLabel: UIKit.Text | null;
     playAgain: UIElement | null;
   };
 
@@ -148,7 +171,10 @@ export class MoleculeSystem extends createSystem({
       ),
       () => this.bondGeo.dispose(),
       () => this.bondMat.dispose(),
+      () => this.guide.dispose(),
     );
+    this.guideOn = loadGuidePref();
+    this.world.createTransformEntity(this.guide.root);
     this.setupPanel();
 
     const save = loadProgress();
@@ -171,6 +197,8 @@ export class MoleculeSystem extends createSystem({
     this.layoutSlots();
     this.filled = this.level.slots.map(() => false);
     this.bondsDone = 0;
+    this.placedCount = 0;
+    this.guide.build(this.level, this.slotWorld);
 
     // Seed first, then the free atoms in a fixed, element-mixed tray order.
     this.seed = this.spawnAtom('C', 0, 0, this.slotWorld[0]);
@@ -190,8 +218,9 @@ export class MoleculeSystem extends createSystem({
     });
 
     if (placements) this.restorePlacements(placements);
+    this.guide.update(this.filled, this.guideOn);
     // Fresh level: cue fully on. Restored mid-level: no cue at all.
-    this.seedCue = this.bondsDone === 0 ? 1 : 0;
+    this.seedCue = this.placedCount === 0 ? 1 : 0;
     this.seedCueClock = 0;
     this.applySeedCue();
     this.persistProgress();
@@ -233,7 +262,7 @@ export class MoleculeSystem extends createSystem({
 
   /** Fades the start-here cue toward on (no bonds yet) or off, and pulses it. */
   private updateSeedCue(delta: number): void {
-    const target = this.bondsDone === 0 ? 1 : 0;
+    const target = this.placedCount === 0 ? 1 : 0;
     if (this.seedCue === 0 && target === 0) return;
     const step = delta / SEED_CUE_FADE;
     this.seedCue =
@@ -337,9 +366,13 @@ export class MoleculeSystem extends createSystem({
       factText,
       allDone,
       next,
+      guideLabel: panel.getElementById<UIKit.Text>('guide-label'),
     };
     this.bindButton(panel.getElementById('restart-button'), 'restart-button', () =>
       this.startLevel(this.levelIndex),
+    );
+    this.bindButton(panel.getElementById('guide-button'), 'guide-button', () =>
+      this.setGuide(!this.guideOn),
     );
     this.bindButton(next, 'next-button', () => {
       if (this.levelIndex < LEVELS.length - 1) this.startLevel(this.levelIndex + 1);
@@ -358,11 +391,20 @@ export class MoleculeSystem extends createSystem({
     this.cleanupFuncs.push(() => button.removeEventListener('click', onClick));
   }
 
+  private setGuide(on: boolean): void {
+    this.guideOn = on;
+    saveGuidePref(on);
+    this.guide.update(this.filled, on);
+    this.hideHint();
+    this.updatePanel();
+  }
+
   private updatePanel(): void {
     if (!this.ui) return;
     const total = this.level.bonds.length;
     const done = this.bondsDone === total;
     const hasNext = this.levelIndex < LEVELS.length - 1;
+    const atomsToPlace = this.level.slots.length - 1; // the seed is given
     this.ui.levelName.setProperties({
       text: `Level ${this.levelIndex + 1}: ${this.level.name}`,
     });
@@ -370,14 +412,24 @@ export class MoleculeSystem extends createSystem({
     this.ui.progress.setProperties({
       text: done
         ? `${this.level.name} complete!`
-        : `Bonds: ${this.bondsDone} / ${total}`,
+        : this.guideOn
+          ? `Atoms placed: ${this.placedCount} / ${atomsToPlace}`
+          : `Bonds: ${this.bondsDone} / ${total}`,
     });
     this.ui.header.setProperties({
       backgroundColor: done ? '#9fe0b8' : '#dcebe8',
     });
     this.ui.instructions.setProperties({
       display: done ? 'none' : 'flex',
-      text: this.bondsDone === 0 ? TEXT_START : TEXT_BUILDING,
+      text: this.guideOn
+        ? TEXT_GUIDE
+        : this.placedCount === 0
+          ? TEXT_START
+          : TEXT_BUILDING,
+    });
+    this.ui.guideLabel?.setProperties({
+      text: this.guideOn ? 'Hide guide' : 'Show guide',
+      fontSize: 19,
     });
     this.ui.factBox.setProperties({ display: done ? 'flex' : 'none' });
     this.ui.allDone.setProperties({ display: done && !hasNext ? 'flex' : 'none' });
@@ -487,6 +539,33 @@ export class MoleculeSystem extends createSystem({
     const element = e.getValue(Atom, 'element');
     const pos = obj.getWorldPosition(this.tmp);
 
+    if (this.guideOn) {
+      // Nearest matching empty spot wins; otherwise a wrong-element spot
+      // under the atom explains what belongs there.
+      let match = -1;
+      let matchDist = GUIDE_CAPTURE;
+      let other = -1;
+      let otherDist = GUIDE_CAPTURE;
+      this.filled.forEach((isFilled, s) => {
+        if (isFilled) return;
+        const d = pos.distanceTo(this.slotWorld[s]);
+        if (this.level.slots[s].element === element) {
+          if (d < matchDist) {
+            matchDist = d;
+            match = s;
+          }
+        } else if (d < otherDist) {
+          otherDist = d;
+          other = s;
+        }
+      });
+      if (match >= 0) return this.place(e, match);
+      if (other >= 0) {
+        const needed = this.level.slots[other].element;
+        return this.reject(e, `This spot needs ${ELEMENT_LABEL[needed]}.`);
+      }
+    }
+
     // Closest placed atom the player dropped this one next to.
     let nearSlot = -1;
     let nearDist = NEAR_ATOM;
@@ -517,13 +596,21 @@ export class MoleculeSystem extends createSystem({
     }
 
     if (best >= 0) this.place(e, best);
-    else if (nearSlot >= 0) this.reject(e);
+    else if (nearSlot >= 0) {
+      this.reject(
+        e,
+        this.guideOn
+          ? 'Place it on a faint spot of the same color.'
+          : `That bond is not in ${this.level.name.toLowerCase()}. Try another spot.`,
+      );
+    }
   }
 
   /** `restoring` places instantly and quietly, without saving again. */
   private place(e: Entity, slot: number, restoring = false): void {
     e.setValue(Atom, 'slot', slot);
     this.filled[slot] = true;
+    this.placedCount++;
     if (e.hasComponent(OneHandGrabbable)) e.removeComponent(OneHandGrabbable);
     if (restoring && e.object3D) {
       this.setWorldPosition(e.object3D, this.slotWorld[slot]);
@@ -546,15 +633,14 @@ export class MoleculeSystem extends createSystem({
       console.info(`[Molecule Lab] ${this.level.name} complete!`);
     }
     if (!restoring) this.persistProgress();
+    this.guide.update(this.filled, this.guideOn);
     this.updatePanel();
   }
 
-  private reject(e: Entity): void {
+  private reject(e: Entity, hint: string): void {
     this.returnHome(e);
     this.flash(e, false);
-    this.showHint(
-      `That bond is not in ${this.level.name.toLowerCase()}. Try another spot.`,
-    );
+    this.showHint(hint);
   }
 
   /** Quietly sends a free atom home, e.g. when play is paused mid-grab. */

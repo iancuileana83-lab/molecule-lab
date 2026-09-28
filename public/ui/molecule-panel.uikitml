@@ -1,9 +1,9 @@
 <!--
   Molecule Lab level panel. Panel, Divider, Button, ButtonIcon and ButtonLabel
-  come from the bundled Horizon kit; ArrowRight, ArrowLeft, RotateCcw and
-  RectangleGoggles are Lucide. Runtime ids: header, level-name, instructions,
-  progress, hint, fact-box, fact-text, all-done, next-button,
-  play-again-button, restart-button, xr-button.
+  come from the bundled Horizon kit; ArrowRight, ArrowLeft, Eye, RotateCcw
+  and RectangleGoggles are Lucide. Runtime ids: header, level-name,
+  instructions, progress, hint, fact-box, fact-text, all-done, next-button,
+  play-again-button, guide-button, guide-label, restart-button, xr-button.
 -->
 <style>
   .panel-root {
@@ -105,6 +105,20 @@
     font-size: 19px;
   }
 
+  .button-row {
+    flex-direction: row;
+    gap: 10px;
+    margin-top: 14px;
+    margin-left: 22px;
+    margin-right: 22px;
+    margin-bottom: 20px;
+  }
+
+  .row-button {
+    width: 188px;
+    justify-content: center;
+  }
+
   .last-button {
     margin-bottom: 20px;
   }
@@ -140,12 +154,20 @@
     </ButtonIcon>
     <ButtonLabel class="button-label">Play again from level 1</ButtonLabel>
   </Button>
-  <Button id="restart-button" class="button last-button">
-    <ButtonIcon>
-      <RotateCcw></RotateCcw>
-    </ButtonIcon>
-    <ButtonLabel class="button-label">Build again</ButtonLabel>
-  </Button>
+  <div class="button-row">
+    <Button id="guide-button" class="row-button">
+      <ButtonIcon>
+        <Eye></Eye>
+      </ButtonIcon>
+      <ButtonLabel id="guide-label" class="button-label">Hide guide</ButtonLabel>
+    </Button>
+    <Button id="restart-button" class="row-button">
+      <ButtonIcon>
+        <RotateCcw></RotateCcw>
+      </ButtonIcon>
+      <ButtonLabel class="button-label">Build again</ButtonLabel>
+    </Button>
+  </div>
   <Button id="xr-button" class="button last-button">
     <ButtonIcon>
       <RectangleGoggles></RectangleGoggles>
