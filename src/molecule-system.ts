@@ -5,9 +5,11 @@ import {
   Grabbed,
   GrabSystem,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
   OneHandGrabbable,
+  TorusGeometry,
   UIKit,
   UIKitMLAsset,
   Vector3,
@@ -60,6 +62,14 @@ const PROTOTYPES: Record<ElementSymbol, Object3D> = {
 
 type UIElement = NonNullable<ReturnType<UIKitMLAsset['getElementById']>>;
 
+/** Start-here cue on the seed: a ring plus a slow glow, until the first bond. */
+const SEED_CUE_COLOR = 0x39d6c0;
+/** White keeps the seed reading as grey carbon while it glows. */
+const SEED_GLOW_COLOR = 0xffffff;
+const SEED_CUE_FADE = 0.6;
+/** Radians per second for the breathing pulse (one cycle every ~2 s). */
+const SEED_CUE_PULSE = Math.PI;
+
 const GOOD_GLOW = 0x3cff9a;
 const BAD_GLOW = 0xff3030;
 
@@ -85,6 +95,12 @@ export class MoleculeSystem extends createSystem({
   /** Seconds after a pause/exit/resume during which releases are set aside. */
   private releaseGrace = 0;
   private hintTime = 0;
+  private seed?: Entity;
+  private seedRing!: Mesh;
+  private seedRingMat!: MeshBasicMaterial;
+  /** 1 = start-here cue fully shown, 0 = hidden. Fades between the two. */
+  private seedCue = 0;
+  private seedCueClock = 0;
   private ui?: {
     header: UIElement;
     levelName: UIKit.Text;
@@ -105,6 +121,22 @@ export class MoleculeSystem extends createSystem({
   init(): void {
     this.bondGeo = new CylinderGeometry(BOND_RADIUS, BOND_RADIUS, 1, 10);
     this.bondMat = new MeshStandardMaterial({ color: 0xd9dde0, roughness: 0.4 });
+    // Torus lies in the XY plane, so it already faces the player (+Z).
+    this.seedRingMat = new MeshBasicMaterial({
+      color: SEED_CUE_COLOR,
+      transparent: true,
+      depthWrite: false,
+    });
+    this.seedRing = new Mesh(
+      new TorusGeometry(0.056, 0.0035, 8, 48),
+      this.seedRingMat,
+    );
+    this.seedRing.name = 'SeedRing';
+    this.world.createTransformEntity(this.seedRing);
+    this.cleanupFuncs.push(
+      () => this.seedRing.geometry.dispose(),
+      () => this.seedRingMat.dispose(),
+    );
 
     const setup = (e: Entity) => this.setupAtom(e);
     const release = (e: Entity) => this.pendingReleases.push(e);
@@ -141,7 +173,8 @@ export class MoleculeSystem extends createSystem({
     this.bondsDone = 0;
 
     // Seed first, then the free atoms in a fixed, element-mixed tray order.
-    this.spawnAtom('C', 0, 0, this.slotWorld[0]);
+    this.seed = this.spawnAtom('C', 0, 0, this.slotWorld[0]);
+    this.setWorldPosition(this.seedRing, this.slotWorld[0]);
     const n = this.level.slots.length;
     const free = this.level.slots
       .map((_, i) => i)
@@ -157,6 +190,10 @@ export class MoleculeSystem extends createSystem({
     });
 
     if (placements) this.restorePlacements(placements);
+    // Fresh level: cue fully on. Restored mid-level: no cue at all.
+    this.seedCue = this.bondsDone === 0 ? 1 : 0;
+    this.seedCueClock = 0;
+    this.applySeedCue();
     this.persistProgress();
     this.updatePanel();
   }
@@ -182,7 +219,7 @@ export class MoleculeSystem extends createSystem({
     index: number,
     slot: number,
     position: Vector3,
-  ): void {
+  ): Entity {
     const obj = PROTOTYPES[element].clone();
     // Stable per level and spawn order, so saved placements can find it.
     obj.name = `Atom ${element}${index}`;
@@ -191,6 +228,33 @@ export class MoleculeSystem extends createSystem({
     e.addComponent(Atom, { element, slot });
     if (slot < 0) e.addComponent(OneHandGrabbable);
     this.setupAtom(e);
+    return e;
+  }
+
+  /** Fades the start-here cue toward on (no bonds yet) or off, and pulses it. */
+  private updateSeedCue(delta: number): void {
+    const target = this.bondsDone === 0 ? 1 : 0;
+    if (this.seedCue === 0 && target === 0) return;
+    const step = delta / SEED_CUE_FADE;
+    this.seedCue =
+      target > this.seedCue
+        ? Math.min(target, this.seedCue + step)
+        : Math.max(target, this.seedCue - step);
+    this.seedCueClock += delta;
+    this.applySeedCue();
+  }
+
+  private applySeedCue(): void {
+    const pulse = 0.5 + 0.5 * Math.sin(this.seedCueClock * SEED_CUE_PULSE);
+    this.seedRing.visible = this.seedCue > 0;
+    this.seedRingMat.opacity = this.seedCue * (0.55 + 0.35 * pulse);
+    const seed = this.seed;
+    // A running success/error flash owns the seed's emissive meanwhile.
+    if (!seed?.object3D || (seed.getValue(Atom, 'flashTime') ?? 0) > 0) return;
+    const mat = this.atomMaterial(seed.object3D);
+    if (!mat) return;
+    mat.emissive.setHex(SEED_GLOW_COLOR);
+    mat.emissiveIntensity = this.seedCue * (0.03 + 0.09 * pulse);
   }
 
   private onVisibilityChange(state: VisibilityState): void {
@@ -351,6 +415,8 @@ export class MoleculeSystem extends createSystem({
     // Frozen while paused: tweens, flashes and the hint resume on return.
     if (this.paused) return;
     if (this.releaseGrace > 0) this.releaseGrace -= delta;
+
+    this.updateSeedCue(delta);
 
     if (this.hintTime > 0) {
       this.hintTime -= delta;

@@ -8,7 +8,7 @@
 <style>
   .panel-root {
     flex-direction: column;
-    width: 360px;
+    width: 430px;
   }
 
   .header {
@@ -22,14 +22,14 @@
   }
 
   .title {
-    font-size: 26px;
+    font-size: 31px;
     font-weight: 700;
     color: #1f2a2a;
   }
 
   .level-name {
     margin-top: 4px;
-    font-size: 18px;
+    font-size: 21px;
     font-weight: 500;
     color: #2e5f58;
   }
@@ -42,14 +42,14 @@
   }
 
   .instructions {
-    font-size: 15px;
+    font-size: 20px;
     line-height: 1.35;
     color: #2b2b2b;
   }
 
   .progress {
     margin-top: 14px;
-    font-size: 24px;
+    font-size: 30px;
     font-weight: 700;
     color: #1f2a2a;
     text-align: center;
@@ -63,7 +63,7 @@
     padding-right: 12px;
     border-radius: 10px;
     background-color: #fbe3df;
-    font-size: 15px;
+    font-size: 19px;
     line-height: 1.3;
     color: #8a1f14;
     text-align: center;
@@ -81,14 +81,14 @@
   }
 
   .fact-text {
-    font-size: 15px;
+    font-size: 19px;
     line-height: 1.35;
     color: #1f3a2c;
   }
 
   .all-done {
     margin-top: 12px;
-    font-size: 18px;
+    font-size: 22px;
     font-weight: 700;
     color: #2e5f58;
     text-align: center;
@@ -99,6 +99,10 @@
     margin-left: 22px;
     margin-right: 22px;
     justify-content: center;
+  }
+
+  .button-label {
+    font-size: 19px;
   }
 
   .last-button {
@@ -125,7 +129,7 @@
     </div>
   </div>
   <Button id="next-button" class="button" style="display: none">
-    <ButtonLabel>Next molecule</ButtonLabel>
+    <ButtonLabel class="button-label">Next molecule</ButtonLabel>
     <ButtonIcon>
       <ArrowRight></ArrowRight>
     </ButtonIcon>
@@ -134,18 +138,18 @@
     <ButtonIcon>
       <ArrowLeft></ArrowLeft>
     </ButtonIcon>
-    <ButtonLabel>Play again from level 1</ButtonLabel>
+    <ButtonLabel class="button-label">Play again from level 1</ButtonLabel>
   </Button>
   <Button id="restart-button" class="button last-button">
     <ButtonIcon>
       <RotateCcw></RotateCcw>
     </ButtonIcon>
-    <ButtonLabel>Build again</ButtonLabel>
+    <ButtonLabel class="button-label">Build again</ButtonLabel>
   </Button>
   <Button id="xr-button" class="button last-button">
     <ButtonIcon>
       <RectangleGoggles></RectangleGoggles>
     </ButtonIcon>
-    <ButtonLabel>Enter VR</ButtonLabel>
+    <ButtonLabel class="button-label">Enter VR</ButtonLabel>
   </Button>
 </Panel>
