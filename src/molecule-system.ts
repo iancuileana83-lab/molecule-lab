@@ -22,10 +22,12 @@ import { LEVELS } from './levels/all-levels.js';
 import type { ElementSymbol, MoleculeLevel } from './levels/types.js';
 import { MoleculeGuide } from './molecule-guide.js';
 import {
+  loadBestScores,
   loadGuidePref,
   loadProgress,
   MoleculeSave,
   loadSoundPref,
+  saveBestScores,
   saveGuidePref,
   saveProgress,
   saveSoundPref,
@@ -35,6 +37,7 @@ import {
   nitrogenAtom,
   oxygenAtom,
 } from './scene-assets/atoms.scene-asset.js';
+import { formatTime, isBetter, Score, scoreOf, starBreakdown } from './scoring.js';
 import { SoundFx } from './sound-fx.js';
 
 /** Metres per angstrom when laying a template out in front of the player. */
@@ -128,6 +131,15 @@ export class MoleculeSystem extends createSystem({
   private guideOn = true;
   /** Atoms placed this level, not counting the seed. */
   private placedCount = 0;
+  /** Active play time; runs from the first grab until completion, never while paused. */
+  private elapsed = 0;
+  private mistakes = 0;
+  private timerStarted = false;
+  private bestScores: Record<string, Score> = {};
+  private lastScore?: Score;
+  private newBest = false;
+  /** False until the first level is laid out; guards saves during init. */
+  private levelReady = false;
   private sfx = new SoundFx();
   private labels!: AtomLabels;
   private burst!: BurstParticles;
@@ -143,6 +155,10 @@ export class MoleculeSystem extends createSystem({
     next: UIElement | null;
     guideLabel: UIKit.Text | null;
     soundLabel: UIKit.Text | null;
+    scoreBox: UIElement | null;
+    stars: Array<UIElement | null>;
+    scoreText: UIKit.Text | null;
+    bestText: UIKit.Text | null;
     playAgain: UIElement | null;
   };
 
@@ -175,6 +191,7 @@ export class MoleculeSystem extends createSystem({
     this.cleanupFuncs.push(
       this.queries.atoms.subscribe('qualify', setup),
       this.queries.held.subscribe('disqualify', release),
+      this.queries.held.subscribe('qualify', () => this.startTimer()),
       this.world.visibilityState.subscribe((state) =>
         this.onVisibilityChange(state),
       ),
@@ -193,13 +210,14 @@ export class MoleculeSystem extends createSystem({
     this.world.createTransformEntity(this.guide.root);
     this.setupPanel();
 
+    this.bestScores = loadBestScores();
     const save = loadProgress();
     const saved = save ? LEVELS.findIndex((l) => l.id === save.levelId) : -1;
-    this.startLevel(Math.max(saved, 0), saved >= 0 ? save?.placements : undefined);
+    this.startLevel(Math.max(saved, 0), saved >= 0 ? (save ?? undefined) : undefined);
   }
 
   /** Clears the current molecule and lays out a level's atoms. */
-  private startLevel(index: number, placements?: Record<string, number>): void {
+  private startLevel(index: number, save?: MoleculeSave): void {
     for (const bond of Array.from(this.queries.bonds.entities)) bond.dispose();
     for (const atom of Array.from(this.queries.atoms.entities)) {
       const mat = atom.object3D ? this.atomMaterial(atom.object3D) : undefined;
@@ -214,6 +232,11 @@ export class MoleculeSystem extends createSystem({
     this.filled = this.level.slots.map(() => false);
     this.bondsDone = 0;
     this.placedCount = 0;
+    this.elapsed = save?.elapsed ?? 0;
+    this.mistakes = save?.mistakes ?? 0;
+    this.timerStarted = save?.timerStarted ?? false;
+    this.lastScore = undefined;
+    this.newBest = false;
     this.guide.build(this.level, this.slotWorld, this.labels);
 
     // Seed first, then the free atoms in a fixed, element-mixed tray order.
@@ -233,14 +256,37 @@ export class MoleculeSystem extends createSystem({
       this.spawnAtom(this.level.slots[slot].element, k + 1, -1, this.tmp);
     });
 
-    if (placements) this.restorePlacements(placements);
+    if (save) this.restorePlacements(save.placements);
+    if (this.isComplete()) {
+      this.lastScore = scoreOf(this.elapsed, this.mistakes, this.level.starTimeSec);
+    }
     this.guide.update(this.filled, this.guideOn);
     // Fresh level: cue fully on. Restored mid-level: no cue at all.
     this.seedCue = this.placedCount === 0 ? 1 : 0;
     this.seedCueClock = 0;
     this.applySeedCue();
+    this.levelReady = true;
     this.persistProgress();
     this.updatePanel();
+  }
+
+  private isComplete(): boolean {
+    return this.bondsDone === this.level.bonds.length;
+  }
+
+  private startTimer(): void {
+    if (!this.timerStarted && !this.isComplete()) this.timerStarted = true;
+  }
+
+  /** Stops the clock, scores the run and keeps the best result per molecule. */
+  private finishRun(): void {
+    const score = scoreOf(this.elapsed, this.mistakes, this.level.starTimeSec);
+    this.lastScore = score;
+    this.newBest = isBetter(score, this.bestScores[this.level.id]);
+    if (this.newBest) {
+      this.bestScores[this.level.id] = score;
+      saveBestScores(this.bestScores);
+    }
   }
 
   /** Centres the template horizontally and rests it at MOLECULE_BOTTOM_Y. */
@@ -310,6 +356,8 @@ export class MoleculeSystem extends createSystem({
     // Hands vanish and reappear around a pause; never judge those releases.
     this.releaseGrace = RELEASE_GRACE;
     if (state === VisibilityState.Visible) return;
+    // Keep the play time counted so far if the app is closed while away.
+    if (this.levelReady) this.persistProgress();
     // Leaving active play: let go of anything in hand. The release is then
     // handled as "set aside", never judged as a bond attempt.
     const grab = this.world.getSystem(GrabSystem);
@@ -335,7 +383,13 @@ export class MoleculeSystem extends createSystem({
   }
 
   private persistProgress(): void {
-    const save: MoleculeSave = { levelId: this.level.id, placements: {} };
+    const save: MoleculeSave = {
+      levelId: this.level.id,
+      placements: {},
+      elapsed: this.elapsed,
+      mistakes: this.mistakes,
+      timerStarted: this.timerStarted,
+    };
     for (const e of this.queries.atoms.entities) {
       const slot = e.getValue(Atom, 'slot') ?? -1;
       const name = e.object3D?.name;
@@ -385,6 +439,10 @@ export class MoleculeSystem extends createSystem({
       next,
       guideLabel: panel.getElementById<UIKit.Text>('guide-label'),
       soundLabel: panel.getElementById<UIKit.Text>('sound-label'),
+      scoreBox: panel.getElementById('score-box'),
+      stars: [1, 2, 3].map((i) => panel.getElementById(`star-${i}`)),
+      scoreText: panel.getElementById<UIKit.Text>('score-text'),
+      bestText: panel.getElementById<UIKit.Text>('best-text'),
     };
     this.bindButton(panel.getElementById('restart-button'), 'restart-button', () =>
       this.startLevel(this.levelIndex),
@@ -410,6 +468,29 @@ export class MoleculeSystem extends createSystem({
     button.name = name;
     button.addEventListener('click', onClick);
     this.cleanupFuncs.push(() => button.removeEventListener('click', onClick));
+  }
+
+  private updateScorePanel(done: boolean): void {
+    const ui = this.ui;
+    if (!ui) return;
+    const score = this.lastScore;
+    ui.scoreBox?.setProperties({ display: done && score ? 'flex' : 'none' });
+    if (!done || !score) return;
+    const b = starBreakdown(score.timeSec, score.mistakes, this.level.starTimeSec);
+    [b.built, b.time, b.precision].forEach((lit, i) =>
+      ui.stars[i]?.setProperties({ color: lit ? '#f2b705' : '#c9ccc8' }),
+    );
+    ui.scoreText?.setProperties({
+      text: `Time ${formatTime(score.timeSec)} | Mistakes ${score.mistakes}`,
+    });
+    const best = this.bestScores[this.level.id];
+    ui.bestText?.setProperties({
+      text: this.newBest
+        ? 'New best!'
+        : best
+          ? `Best: ${best.stars} ${best.stars === 1 ? 'star' : 'stars'}, ${formatTime(best.timeSec)}`
+          : '',
+    });
   }
 
   private setSound(on: boolean): void {
@@ -464,6 +545,7 @@ export class MoleculeSystem extends createSystem({
       fontSize: 19,
     });
     this.ui.factBox.setProperties({ display: done ? 'flex' : 'none' });
+    this.updateScorePanel(done);
     this.ui.allDone.setProperties({ display: done && !hasNext ? 'flex' : 'none' });
     this.ui.next?.setProperties({ display: done && hasNext ? 'flex' : 'none' });
     this.ui.playAgain?.setProperties({
@@ -500,6 +582,13 @@ export class MoleculeSystem extends createSystem({
     if (this.paused) return;
     if (this.releaseGrace > 0) this.releaseGrace -= delta;
     this.burst.update(delta);
+    if (
+      this.timerStarted &&
+      !this.isComplete() &&
+      this.world.visibilityState.peek() === VisibilityState.Visible
+    ) {
+      this.elapsed += delta;
+    }
 
     this.updateSeedCue(delta);
 
@@ -666,6 +755,7 @@ export class MoleculeSystem extends createSystem({
       for (const atom of this.queries.atoms.entities) this.flash(atom, true);
       this.sfx.complete();
       this.burst.start(this.moleculeCenter());
+      this.finishRun();
       console.info(`[Molecule Lab] ${this.level.name} complete!`);
     } else if (!restoring) {
       this.sfx.snap(this.placedCount / (this.level.slots.length - 1));
@@ -679,6 +769,8 @@ export class MoleculeSystem extends createSystem({
     this.returnHome(e);
     this.flash(e, false);
     this.sfx.error();
+    if (!this.isComplete()) this.mistakes++;
+    this.persistProgress();
     this.showHint(hint);
   }
 

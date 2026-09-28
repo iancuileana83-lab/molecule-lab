@@ -33,5 +33,6 @@ export const PARACETAMOL: MoleculeLevel = {
     [8, 9, 2],
     [8, 10, 1],
   ],
+  starTimeSec: 120,
   fact: 'Paracetamol (called acetaminophen in the US) relieves pain and reduces fever. It became widely used in the 1950s and is on the WHO List of Essential Medicines.',
 };

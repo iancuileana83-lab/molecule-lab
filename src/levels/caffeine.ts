@@ -54,5 +54,6 @@ export const CAFFEINE: MoleculeLevel = {
     [2, 12, 1], // N3–CH3
     [7, 13, 1], // N7–CH3
   ],
+  starTimeSec: 165,
   fact: 'Caffeine is a natural stimulant found in coffee, tea and cacao. As a medicine, caffeine citrate helps premature babies breathe regularly, and it is on the WHO List of Essential Medicines.',
 };

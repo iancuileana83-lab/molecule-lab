@@ -41,5 +41,6 @@ export const ASPIRIN: MoleculeLevel = {
     [10, 11, 2],
     [10, 12, 1],
   ],
+  starTimeSec: 150,
   fact: 'Aspirin relieves pain and reduces fever and inflammation. Bayer first produced it in a pure, stable form in 1897, from salicylic acid, a relative of a compound found in willow bark. It is also on the WHO List of Essential Medicines.',
 };

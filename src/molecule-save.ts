@@ -1,3 +1,5 @@
+import type { Score } from './scoring.js';
+
 /**
  * Per-device save of the current level and its molecule progress, so a
  * reload or an app suspended by the OS resumes exactly where the player left
@@ -8,6 +10,10 @@ export interface MoleculeSave {
   levelId: string;
   /** Atom object name -> template slot it occupies. */
   placements: Record<string, number>;
+  /** Active play time in seconds (pauses excluded); absent in older saves. */
+  elapsed?: number;
+  mistakes?: number;
+  timerStarted?: boolean;
 }
 
 const KEY = 'molecule-lab:progress:v2';
@@ -28,6 +34,26 @@ export function loadProgress(): MoleculeSave | null {
 }
 
 const GUIDE_KEY = 'molecule-lab:guide:v1';
+const BEST_KEY = 'molecule-lab:best:v1';
+
+/** Best score per level id. */
+export function loadBestScores(): Record<string, Score> {
+  try {
+    const raw = localStorage.getItem(BEST_KEY);
+    const data = raw ? (JSON.parse(raw) as Record<string, Score>) : {};
+    return data && typeof data === 'object' ? data : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveBestScores(best: Record<string, Score>): void {
+  try {
+    localStorage.setItem(BEST_KEY, JSON.stringify(best));
+  } catch {
+    // Best scores simply are not persisted on this device.
+  }
+}
 const SOUND_KEY = 'molecule-lab:sound:v1';
 
 /** Whether sound effects play; on unless muted. */

@@ -32,8 +32,8 @@ These apply to every phase. A feature that breaks one of them is not done.
 | # | Phase | Status |
 |---|-------|--------|
 | 1 | Sounds, particles, atom letters | done |
-| 2 | Stars and best score per molecule | next |
-| 3 | Publish to GitHub Pages so testers can open a link | planned |
+| 2 | Stars and best score per molecule | done |
+| 3 | Publish to GitHub Pages so testers can open a link | next |
 | 4 | Gaze + pinch support for Meta VR Glasses, fully playable | planned |
 | 5 | 2D textbook formula on the panel that lights up as atoms are placed | planned |
 | 6 | Accessibility package | planned |
@@ -49,9 +49,11 @@ These apply to every phase. A feature that breaks one of them is not done.
    that rises as the molecule grows, soft mistake tone, completion arpeggio), a small
    spark burst on completion, a Mute sound / Unmute sound button (saved), and C/N/O
    letters on atoms and guide spots.
-2. **Stars and best score** — 1–3 stars from time and mistakes with lenient thresholds;
-   the timer ignores pauses and animations and is shown only at the end; the guide does
-   not affect stars; the best result per molecule is saved.
+2. **Stars and best score** — one star each for Built (always), Time (within the level
+   limit: paracetamol 2:00, aspirin 2:30, caffeine 2:45) and Precision (at most 2
+   mistakes). The timer starts at the first grab, ignores pauses and time out of VR, is
+   hidden during play and shown only at the end; the guide does not affect stars. Time,
+   mistakes and the best result per molecule are saved (more stars wins, then faster).
 3. **GitHub Pages** — a public HTTPS link testers can open on a Quest.
 4. **Gaze + pinch** — the whole game playable on Meta VR Glasses (gaze to target,
    pinch to act).
