@@ -33,8 +33,8 @@ These apply to every phase. A feature that breaks one of them is not done.
 |---|-------|--------|
 | 1 | Sounds, particles, atom letters | done |
 | 2 | Stars and best score per molecule | done |
-| 3 | Publish to GitHub Pages so testers can open a link | next |
-| 4 | Gaze + pinch support for Meta VR Glasses, fully playable | planned |
+| 3 | Publish to GitHub Pages so testers can open a link | done |
+| 4 | Gaze + pinch support for Meta VR Glasses, fully playable | next |
 | 5 | 2D textbook formula on the panel that lights up as atoms are placed | planned |
 | 6 | Accessibility package | planned |
 | 7 | Medicine cabinet with miniature trophies of completed molecules | planned |
@@ -54,7 +54,10 @@ These apply to every phase. A feature that breaks one of them is not done.
    mistakes). The timer starts at the first grab, ignores pauses and time out of VR, is
    hidden during play and shown only at the end; the guide does not affect stars. Time,
    mistakes and the best result per molecule are saved (more stars wins, then faster).
-3. **GitHub Pages** — a public HTTPS link testers can open on a Quest.
+3. **GitHub Pages** — live at https://iancuileana83-lab.github.io/molecule-lab/
+   (repository https://github.com/iancuileana83-lab/molecule-lab). The workflow
+   `.github/workflows/deploy.yml` builds and publishes on every push to `main`;
+   Pages source is "GitHub Actions". Commits use the GitHub noreply email.
 4. **Gaze + pinch** — the whole game playable on Meta VR Glasses (gaze to target,
    pinch to act).
 5. **Textbook formula** — a 2D skeletal formula on the panel whose atoms light up as
