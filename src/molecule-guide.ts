@@ -1,5 +1,7 @@
 import {
   CylinderGeometry,
+  MeshBasicMaterial,
+  TorusGeometry,
   Group,
   Mesh,
   MeshStandardMaterial,
@@ -17,6 +19,14 @@ const GHOST_COLOR: Record<ElementSymbol, number> = {
   O: 0xff8f85,
 };
 const GHOST_OPACITY = 0.3;
+/** Bright outline per spot: stays readable on any wall colour. */
+const RING_COLOR: Record<ElementSymbol, number> = {
+  C: 0xf4f4f4,
+  N: 0xb8d0ff,
+  O: 0xffc2ba,
+};
+const RING_OPACITY = 0.85;
+const RING_TUBE = 0.0024;
 const GHOST_LINE_OPACITY = 0.22;
 const GHOST_LINE_RADIUS = 0.0022;
 const GHOST_DOUBLE_OFFSET = 0.009;
@@ -32,6 +42,8 @@ export class MoleculeGuide {
   private lines: Array<{ a: number; b: number; meshes: Mesh[] }> = [];
   private spotGeo: Record<ElementSymbol, SphereGeometry>;
   private spotMat: Record<ElementSymbol, MeshStandardMaterial>;
+  private ringGeo = {} as Record<ElementSymbol, TorusGeometry>;
+  private ringMat = {} as Record<ElementSymbol, MeshBasicMaterial>;
   private lineGeo = new CylinderGeometry(
     GHOST_LINE_RADIUS,
     GHOST_LINE_RADIUS,
@@ -60,6 +72,15 @@ export class MoleculeGuide {
       });
     this.spotGeo = { C: spot('C'), N: spot('N'), O: spot('O') };
     this.spotMat = { C: mat('C'), N: mat('N'), O: mat('O') };
+    for (const el of ['C', 'N', 'O'] as const) {
+      this.ringGeo[el] = new TorusGeometry(ATOM_RADIUS[el] + 0.001, RING_TUBE, 6, 28);
+      this.ringMat[el] = new MeshBasicMaterial({
+        color: RING_COLOR[el],
+        transparent: true,
+        opacity: RING_OPACITY,
+        depthWrite: false,
+      });
+    }
   }
 
   /** Rebuilds spots and lines for a level. `slotWorld` are world positions. */
@@ -69,6 +90,7 @@ export class MoleculeGuide {
       const m = new Mesh(this.spotGeo[s.element], this.spotMat[s.element]);
       m.name = `GuideSpot${i}`;
       m.position.copy(slotWorld[i]);
+      m.add(new Mesh(this.ringGeo[s.element], this.ringMat[s.element]));
       if (labels) m.add(labels.create(s.element, true));
       this.root.add(m);
       return m;
@@ -114,6 +136,8 @@ export class MoleculeGuide {
     for (const el of ['C', 'N', 'O'] as const) {
       this.spotGeo[el].dispose();
       this.spotMat[el].dispose();
+      this.ringGeo[el].dispose();
+      this.ringMat[el].dispose();
     }
     this.lineGeo.dispose();
     this.lineMat.dispose();

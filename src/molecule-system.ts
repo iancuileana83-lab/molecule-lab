@@ -21,6 +21,7 @@ import {
 import { Atom, Bond } from './atom-component.js';
 import { AtomLabels } from './atom-labels.js';
 import { BurstParticles } from './burst-particles.js';
+import { paintDecor } from './decor-paint.js';
 import { LEVELS } from './levels/all-levels.js';
 import type { ElementSymbol, MoleculeLevel } from './levels/types.js';
 import { MoleculeGuide } from './molecule-guide.js';
@@ -86,6 +87,13 @@ const TEXT_GAZE_BUILDING =
 /** How often the session is checked for a gaze input source. */
 const GAZE_CHECK_INTERVAL = 0.5;
 const HELD_GLOW = 0.25;
+/** Bond-forming animation. */
+const POP_TIME = 0.32;
+const POP_SCALE = 0.3;
+const STICK_GROW_TIME = 0.24;
+const STICK_DELAY = 0.1;
+const RING_POOL = 6;
+const RING_TIME = 0.42;
 
 const ELEMENT_LABEL: Record<ElementSymbol, string> = {
   C: 'carbon (grey)',
@@ -140,6 +148,19 @@ export class MoleculeSystem extends createSystem({
   /** 1 = start-here cue fully shown, 0 = hidden. Fades between the two. */
   private seedCue = 0;
   private seedCueClock = 0;
+  /** Bond sticks still growing from the newly placed atom. */
+  private growing: Array<{
+    stick: Mesh;
+    from: Vector3;
+    dir: Vector3;
+    length: number;
+    t: number;
+  }> = [];
+  private rings: Mesh[] = [];
+  private ringMats: MeshBasicMaterial[] = [];
+  private ringAge: number[] = [];
+  private ringNext = 0;
+  private ringGeo!: TorusGeometry;
   private guide = new MoleculeGuide();
   private guideOn = true;
   /** Atoms placed this level, not counting the seed. */
@@ -229,6 +250,29 @@ export class MoleculeSystem extends createSystem({
     this.labels = new AtomLabels();
     this.burst = new BurstParticles();
     this.world.createTransformEntity(this.burst.points);
+    this.ringGeo = new TorusGeometry(0.03, 0.0032, 6, 28);
+    for (let i = 0; i < RING_POOL; i++) {
+      const mat = new MeshBasicMaterial({
+        color: 0xffe08a,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      });
+      const ring = new Mesh(this.ringGeo, mat);
+      ring.name = 'BondRing';
+      ring.visible = false;
+      ring.frustumCulled = false;
+      this.world.createTransformEntity(ring);
+      this.rings.push(ring);
+      this.ringMats.push(mat);
+      this.ringAge.push(RING_TIME);
+    }
+    this.cleanupFuncs.push(() => {
+      this.ringGeo.dispose();
+      this.ringMats.forEach((m) => m.dispose());
+    });
+    const room = this.world.getSceneObject<Object3D>('lab-room');
+    if (room) this.cleanupFuncs.push(paintDecor(room));
     this.world.createTransformEntity(this.guide.root);
     this.setupPanel();
 
@@ -241,6 +285,9 @@ export class MoleculeSystem extends createSystem({
   /** Clears the current molecule and lays out a level's atoms. */
   private startLevel(index: number, save?: MoleculeSave): void {
     for (const bond of Array.from(this.queries.bonds.entities)) bond.dispose();
+    this.growing.length = 0;
+    this.ringAge.fill(RING_TIME);
+    this.rings.forEach((r) => (r.visible = false));
     for (const atom of Array.from(this.queries.atoms.entities)) {
       const mat = atom.object3D ? this.atomMaterial(atom.object3D) : undefined;
       mat?.dispose(); // per-atom clone made in setupAtom
@@ -648,7 +695,7 @@ export class MoleculeSystem extends createSystem({
       fontSize: 19,
     });
     this.ui.soundLabel?.setProperties({
-      text: this.sfx.muted ? 'Unmute sound' : 'Mute sound',
+      text: this.sfx.muted ? 'Unmute' : 'Mute',
       fontSize: 19,
     });
     this.ui.factBox.setProperties({ display: done ? 'flex' : 'none' });
@@ -690,6 +737,7 @@ export class MoleculeSystem extends createSystem({
     if (this.releaseGrace > 0) this.releaseGrace -= delta;
     this.burst.update(delta);
     this.updateGazeMode(delta);
+    this.updateBondFx(delta);
     if (
       this.timerStarted &&
       !this.isComplete() &&
@@ -736,6 +784,14 @@ export class MoleculeSystem extends createSystem({
         e.setValue(Atom, 'flashTime', left);
         const mat = this.atomMaterial(obj);
         if (mat) mat.emissiveIntensity = (left / FLASH_TIME) * 0.9;
+      }
+
+      const pop = e.getValue(Atom, 'popTime') ?? 1;
+      if (pop < POP_TIME) {
+        const t = pop + delta;
+        const k = Math.min(t / POP_TIME, 1);
+        obj.scale.setScalar(k >= 1 ? 1 : 1 + POP_SCALE * Math.sin(Math.PI * k));
+        e.setValue(Atom, 'popTime', t);
       }
     }
   }
@@ -845,6 +901,7 @@ export class MoleculeSystem extends createSystem({
     if (restoring && e.object3D) {
       this.setWorldPosition(e.object3D, this.slotWorld[slot]);
     } else {
+      e.setValue(Atom, 'popTime', 0);
       this.startTween(e, this.slotWorld[slot], SNAP_TIME);
       this.flash(e, true);
       this.hideHint();
@@ -853,7 +910,12 @@ export class MoleculeSystem extends createSystem({
     for (const [a, b, order] of this.level.bonds) {
       const other = a === slot ? b : b === slot ? a : -1;
       if (other >= 0 && this.filled[other]) {
-        this.spawnBond(this.slotWorld[slot], this.slotWorld[other], order);
+        this.spawnBond(this.slotWorld[slot], this.slotWorld[other], order, !restoring);
+        if (!restoring) {
+          const p = this.slotWorld[slot];
+          const q = this.slotWorld[other];
+          this.emitRing((p.x + q.x) / 2, (p.y + q.y) / 2, (p.z + q.z) / 2 + 0.045);
+        }
         this.bondsDone++;
       }
     }
@@ -901,7 +963,41 @@ export class MoleculeSystem extends createSystem({
     this.startTween(e, this.tmp2, RETURN_TIME);
   }
 
-  private spawnBond(a: Vector3, b: Vector3, order: 1 | 2): void {
+  /** Ring that expands and fades at the middle of a new bond. */
+  private emitRing(x: number, y: number, z: number): void {
+    const i = this.ringNext;
+    this.ringNext = (i + 1) % RING_POOL;
+    this.ringAge[i] = -STICK_DELAY;
+    this.rings[i].position.set(x, y, z);
+    this.rings[i].scale.setScalar(0.6);
+    this.rings[i].visible = false;
+  }
+
+  private updateBondFx(delta: number): void {
+    for (let i = this.growing.length - 1; i >= 0; i--) {
+      const g = this.growing[i];
+      g.t += delta;
+      if (g.t < 0) continue;
+      const k = Math.min(g.t / STICK_GROW_TIME, 1);
+      const ease = 1 - (1 - k) * (1 - k);
+      const len = Math.max(g.length * ease, 0.0001);
+      g.stick.scale.y = len;
+      g.stick.position.copy(g.from).addScaledVector(g.dir, len / 2);
+      g.stick.visible = true;
+      if (k >= 1) this.growing.splice(i, 1);
+    }
+    for (let i = 0; i < RING_POOL; i++) {
+      if (this.ringAge[i] >= RING_TIME) continue;
+      this.ringAge[i] += delta;
+      if (this.ringAge[i] < 0) continue;
+      const k = Math.min(this.ringAge[i] / RING_TIME, 1);
+      this.rings[i].visible = k < 1;
+      this.rings[i].scale.setScalar(0.6 + 1.6 * k);
+      this.ringMats[i].opacity = 0.95 * (1 - k) * (1 - k);
+    }
+  }
+
+  private spawnBond(a: Vector3, b: Vector3, order: 1 | 2, animate = false): void {
     const dir = new Vector3().subVectors(b, a);
     const length = dir.length();
     dir.normalize();
@@ -919,6 +1015,18 @@ export class MoleculeSystem extends createSystem({
         .addScaledVector(side, o);
       stick.quaternion.setFromUnitVectors(this.up, dir);
       stick.scale.set(1, length, 1);
+      if (animate) {
+        // Grows from the atom that was just placed toward its partner.
+        stick.visible = false;
+        stick.scale.y = 0.0001;
+        this.growing.push({
+          stick,
+          from: new Vector3().copy(a).addScaledVector(side, o),
+          dir: dir.clone(),
+          length,
+          t: -STICK_DELAY,
+        });
+      }
       this.world.createTransformEntity(stick).addComponent(Bond);
     }
   }

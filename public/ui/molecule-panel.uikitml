@@ -225,7 +225,7 @@
       <ButtonIcon>
         <Volume2></Volume2>
       </ButtonIcon>
-      <ButtonLabel id="sound-label" class="button-label">Mute sound</ButtonLabel>
+      <ButtonLabel id="sound-label" class="button-label">Mute</ButtonLabel>
     </Button>
   </div>
   <Button id="restart-button" class="button last-button">

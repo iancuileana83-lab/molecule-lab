@@ -24,6 +24,8 @@ export const Atom = createComponent('Atom', {
   tweenDuration: { type: Types.Float32, default: 0.2 },
   flashTime: { type: Types.Float32, default: 0 },
   flashGood: { type: Types.Boolean, default: true },
+  /** Seconds since the placement "pop" began; >= POP_TIME means idle. */
+  popTime: { type: Types.Float32, default: 1 },
 });
 
 /** A bond stick spawned between two placed atoms. */

@@ -1,4 +1,10 @@
-import { Mesh, MeshStandardMaterial, SphereGeometry } from '@iwsdk/core';
+import {
+  BackSide,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  SphereGeometry,
+} from '@iwsdk/core';
 
 /**
  * Heavy-atom spheres (hydrogens are implicit). Origin at the sphere centre.
@@ -6,12 +12,33 @@ import { Mesh, MeshStandardMaterial, SphereGeometry } from '@iwsdk/core';
  */
 export const ATOM_RADIUS = { C: 0.034, N: 0.033, O: 0.032 } as const;
 
+/**
+ * Every atom gets a dark "ink" outline (a slightly larger, back-facing shell).
+ * Its edge contrasts strongly with the mid-tone wall for every element, which
+ * a lighter or redder body alone cannot do, and unlike a light outline it can
+ * never be mistaken for the pale rings of the guide spots.
+ */
+const OUTLINE_COLOR = 0x1b1210;
+const OUTLINE_SCALE = 1.075;
+const outlineMaterial = new MeshBasicMaterial({
+  color: OUTLINE_COLOR,
+  side: BackSide,
+});
+
 function atom(name: string, radius: number, color: number): Mesh {
   const mesh = new Mesh(
-    new SphereGeometry(radius, 28, 18),
-    new MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.05 }),
+    new SphereGeometry(radius, 24, 16),
+    // Glossy: low roughness picks up the warm room reflections; a touch of
+    // metalness deepens the colour without darkening it.
+    new MeshStandardMaterial({ color, roughness: 0.24, metalness: 0.1 }),
   );
   mesh.name = name;
+  const outline = new Mesh(
+    new SphereGeometry(radius * OUTLINE_SCALE, 18, 12),
+    outlineMaterial,
+  );
+  outline.name = 'Outline';
+  mesh.add(outline);
   return mesh;
 }
 

@@ -35,8 +35,8 @@ These apply to every phase. A feature that breaks one of them is not done.
 | 2 | Stars and best score per molecule | done |
 | 3 | Publish to GitHub Pages so testers can open a link | done |
 | 4 | Gaze + pinch support for Meta VR Glasses, fully playable | done |
-| 5 | Visual polish: a warm old apothecary instead of the grey lab | next |
-| 6 | First 30 seconds: an opening that shows what to do and feels good | planned |
+| 5 | Visual polish: a warm old apothecary instead of the grey lab | done |
+| 6 | First 30 seconds: an opening that shows what to do and feels good | next |
 | 7 | 2D textbook formula on the panel that lights up as atoms are placed | planned |
 | 8 | Accessibility package | planned |
 | 9 | Medicine cabinet with miniature trophies of completed molecules | planned |
@@ -75,7 +75,16 @@ These apply to every phase. A feature that breaks one of them is not done.
    pleasant, with a short, satisfying animation each time a bond forms. Everything
    built from simple shapes and code-generated textures, no downloaded models. Must
    stay smooth on the headset (few lights, simple geometry), and colour contrast and
-   text must stay easy to read.
+   text must stay easy to read. Built: procedural apothecary (plank floor, sage walls with
+   wainscot, marble-topped bench, drawer wall, jar shelves with Latin labels and one Rx,
+   Hygeia sign, lanterns, beams, rug); mortar and brass balance on a far counter, out of
+   reach; wall behind the molecule kept mid-tone and free of props. Textures come from
+   code (DataTexture math; canvas painting for labels/sign at runtime), the room is ~8k
+   triangles merged into 20 meshes, scene ~11k, no extra lights. Atoms are glossy with a
+   dark ink outline (edge contrast about 4.6:1 vs the wall; the oxygen body alone is only
+   about 2.1:1), guide spots have bright rings, bonds animate (pop, growing stick, ring).
+   Measured on the desktop emulator: 60 fps steady, 2 dropped frames in 3,600 while
+   placing atoms; headset fps still needs a real device.
 6. **First 30 seconds** — an opening that makes the player understand immediately
    what to do and feel a small joy, e.g. the first atom discreetly "inviting" the
    player to grab it; no long tutorial and no hover.
