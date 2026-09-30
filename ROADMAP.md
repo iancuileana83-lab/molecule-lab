@@ -34,8 +34,8 @@ These apply to every phase. A feature that breaks one of them is not done.
 | 1 | Sounds, particles, atom letters | done |
 | 2 | Stars and best score per molecule | done |
 | 3 | Publish to GitHub Pages so testers can open a link | done |
-| 4 | Gaze + pinch support for Meta VR Glasses, fully playable | next |
-| 5 | Visual polish: a warm old apothecary instead of the grey lab | planned |
+| 4 | Gaze + pinch support for Meta VR Glasses, fully playable | done |
+| 5 | Visual polish: a warm old apothecary instead of the grey lab | next |
 | 6 | First 30 seconds: an opening that shows what to do and feels good | planned |
 | 7 | 2D textbook formula on the panel that lights up as atoms are placed | planned |
 | 8 | Accessibility package | planned |
@@ -60,8 +60,16 @@ These apply to every phase. A feature that breaks one of them is not done.
    (repository https://github.com/iancuileana83-lab/molecule-lab). The workflow
    `.github/workflows/deploy.yml` builds and publishes on every push to `main`;
    Pages source is "GitHub Actions". Commits use the GitHub noreply email.
-4. **Gaze + pinch** — the whole game playable on Meta VR Glasses (gaze to target,
-   pinch to act).
+4. **Gaze + pinch** — gaze tracking is requested as an optional XR feature. When the
+   session offers an eye-gaze source (Meta VR Glasses), atoms become distance-grabbable:
+   look at an atom, pinch with either hand, move the hand; a held atom glows softly and
+   the panel instructions adapt. Quest keeps near pinch only (distance grab there is a
+   candidate for the accessibility phase). The level is laid out again through the save
+   when the mode changes. Verified in the emulator on Meta VR Glasses (all three
+   molecules, mistakes, every panel button, guide on/off) and on Quest 3 (near pinch,
+   reload restore). Real eye-tracking accuracy needs a device. Also fixed along the way:
+   atom letters no longer intercept rays, and panel buttons activate on press-then-release
+   so slow pinches are not lost to the 300 ms click limit.
 5. **Visual polish** — turn the grey lab into a warm old pharmacy (apothecary): wood,
    glass jars on shelves, brass details, warm soft light. Atoms look glossy and
    pleasant, with a short, satisfying animation each time a bond forms. Everything
@@ -100,6 +108,9 @@ These apply to every phase. A feature that breaks one of them is not done.
 
 ## Known open checks
 
+- Gaze accuracy and comfort on real Meta VR Glasses cannot be judged in the emulator.
+- Emulator device stays on Quest 3 in `iwsdk.config.json`; switch `dev.emulator.device`
+  to `metaVRGlasses` locally only to test gaze (do not commit it).
 - Poke (finger press) on panel buttons and the Meta system-menu pause while holding an
   atom can only be verified on a real headset; the emulator covers pinch-ray clicks.
 - Sounds cannot be heard in automated emulator tests; only their error-free triggering
