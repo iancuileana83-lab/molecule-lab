@@ -36,8 +36,8 @@ These apply to every phase. A feature that breaks one of them is not done.
 | 3 | Publish to GitHub Pages so testers can open a link | done |
 | 4 | Gaze + pinch support for Meta VR Glasses, fully playable | done |
 | 5 | Visual polish: a warm old apothecary instead of the grey lab | done |
-| 6 | First 30 seconds: an opening that shows what to do and feels good | next |
-| 7 | 2D textbook formula on the panel that lights up as atoms are placed | planned |
+| 6 | First 30 seconds: an opening that shows what to do and feels good | done |
+| 7 | 2D textbook formula on the panel that lights up as atoms are placed | next |
 | 8 | Accessibility package | planned |
 | 9 | Medicine cabinet with miniature trophies of completed molecules | planned |
 | 10 | Inspect the finished molecule with one or two hands; pull it apart with two hands to rebuild | planned |
@@ -87,7 +87,18 @@ These apply to every phase. A feature that breaks one of them is not done.
    placing atoms; headset fps still needs a real device.
 6. **First 30 seconds** — an opening that makes the player understand immediately
    what to do and feel a small joy, e.g. the first atom discreetly "inviting" the
-   player to grab it; no long tutorial and no hover.
+   player to grab it; no long tutorial and no hover. Built: a title screen before VR
+   (description, a discreet credit line and a big Enter VR button; game UI hidden until
+   VR); on entering VR a soft chime (respects Mute), lanterns fade up and the guide
+   sketch draws itself; after 3 s one atom breathes, its target spot pulses and a bead
+   of light travels between them (purely time-driven, no hover or gaze dependence);
+   the panel coaches in big text ("Pick up the glowing atom." / "Now bring it to the
+   glowing spot." / "Nice! That's your first bond.") with sparks, a chime and a lantern
+   flash on the first bond. The full introduction runs once per device (saved); later
+   the calm hint (breathing atom + bead) appears only after 12 s of stillness. Gaze
+   variant on Meta VR Glasses ("Look at the glowing atom and pinch."). The timer still
+   starts only at the first grab. To see the introduction again, clear the site's
+   local data or use a private window.
 7. **Textbook formula** — a 2D skeletal formula on the panel whose atoms light up as
    they are placed.
 8. **Accessibility package** — move the table closer/farther, fully playable with one

@@ -39,7 +39,13 @@ const GHOST_DOUBLE_OFFSET = 0.009;
 export class MoleculeGuide {
   readonly root = new Group();
   private spots: Mesh[] = [];
-  private lines: Array<{ a: number; b: number; meshes: Mesh[] }> = [];
+  private lines: Array<{ a: number; b: number; meshes: Mesh[]; length: number }> = [];
+  /** 0..1: how much of the sketch has "drawn itself" so far. */
+  private reveal = 1;
+  private pulseSlot = -1;
+  private pulseK = 0;
+  private filledRef: boolean[] = [];
+  private guideOn = true;
   private spotGeo: Record<ElementSymbol, SphereGeometry>;
   private spotMat: Record<ElementSymbol, MeshStandardMaterial>;
   private ringGeo = {} as Record<ElementSymbol, TorusGeometry>;
@@ -118,16 +124,52 @@ export class MoleculeGuide {
         this.root.add(m);
         return m;
       });
-      return { a, b, meshes };
+      return { a, b, meshes, length };
     });
   }
 
   /** Shows empty spots and not-yet-formed bonds while the guide is on. */
   update(filled: boolean[], guideOn: boolean): void {
-    this.spots.forEach((m, i) => (m.visible = guideOn && !filled[i]));
+    this.filledRef = filled;
+    this.guideOn = guideOn;
+    this.refresh();
+  }
+
+  /** The sketch draws itself, spot by spot: 0 = nothing yet, 1 = complete. */
+  setReveal(k: number): void {
+    this.reveal = k;
+    this.refresh();
+  }
+
+  /** Gently pulses one spot (-1 for none); `k` is 0..1. */
+  setPulse(slot: number, k: number): void {
+    this.pulseSlot = slot;
+    this.pulseK = k;
+    this.refresh();
+  }
+
+  private revealOf(i: number): number {
+    const n = this.spots.length;
+    const v = Math.min(Math.max((this.reveal * (n + 3) - i) / 3, 0), 1);
+    return v * v * (3 - 2 * v);
+  }
+
+  private refresh(): void {
+    this.spots.forEach((m, i) => {
+      const r = this.revealOf(i);
+      m.visible = this.guideOn && !this.filledRef[i] && r > 0.001;
+      m.scale.setScalar(r * (i === this.pulseSlot ? 1 + 0.16 * this.pulseK : 1));
+    });
     for (const line of this.lines) {
-      const show = guideOn && !(filled[line.a] && filled[line.b]);
-      for (const m of line.meshes) m.visible = show;
+      const t = Math.min(this.revealOf(line.a), this.revealOf(line.b));
+      const show =
+        this.guideOn &&
+        !(this.filledRef[line.a] && this.filledRef[line.b]) &&
+        t > 0.001;
+      for (const m of line.meshes) {
+        m.visible = show;
+        m.scale.set(t, line.length, t);
+      }
     }
   }
 

@@ -34,6 +34,24 @@ export function loadProgress(): MoleculeSave | null {
 }
 
 const GUIDE_KEY = 'molecule-lab:guide:v1';
+const INTRO_KEY = 'molecule-lab:intro:v1';
+
+/** Whether the player has already been through the first-bond introduction. */
+export function loadIntroDone(): boolean {
+  try {
+    return localStorage.getItem(INTRO_KEY) === 'done';
+  } catch {
+    return false;
+  }
+}
+
+export function saveIntroDone(): void {
+  try {
+    localStorage.setItem(INTRO_KEY, 'done');
+  } catch {
+    // The introduction may simply be shown again on this device.
+  }
+}
 const BEST_KEY = 'molecule-lab:best:v1';
 
 /** Best score per level id. */

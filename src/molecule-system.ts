@@ -21,18 +21,22 @@ import {
 import { Atom, Bond } from './atom-component.js';
 import { AtomLabels } from './atom-labels.js';
 import { BurstParticles } from './burst-particles.js';
+import { LanternGlow } from './decor-anim.js';
 import { paintDecor } from './decor-paint.js';
+import { GuideBead } from './guide-bead.js';
 import { LEVELS } from './levels/all-levels.js';
 import type { ElementSymbol, MoleculeLevel } from './levels/types.js';
 import { MoleculeGuide } from './molecule-guide.js';
 import {
   loadBestScores,
   loadGuidePref,
+  loadIntroDone,
   loadProgress,
   MoleculeSave,
   loadSoundPref,
   saveBestScores,
   saveGuidePref,
+  saveIntroDone,
   saveProgress,
   saveSoundPref,
 } from './molecule-save.js';
@@ -94,6 +98,26 @@ const STICK_GROW_TIME = 0.24;
 const STICK_DELAY = 0.1;
 const RING_POOL = 6;
 const RING_TIME = 0.42;
+
+/** The first 30 seconds: welcome, sketch drawing itself, invitation, first bond. */
+const REVEAL_TIME = 2.6;
+const LANTERN_FADE = 2;
+const LANTERN_DIM = 0.55;
+/** Seconds of stillness before the glowing-atom invitation starts. */
+const INTRO_BREATH_AT = 3;
+const IDLE_BREATH_AT = 12;
+/** The bead starts this long after the atom begins to glow. */
+const BEAD_AFTER = 2;
+const COACH_PERIOD = 1.4;
+const COACH_BOB = 0.008;
+const COACH_SCALE = 0.06;
+const COACH_GLOW = 0xffc860;
+const FIRST_BOND_TEXT_TIME = 4;
+const TEXT_INTRO_PICK = 'Pick up the glowing atom.';
+const TEXT_INTRO_PICK_GAZE = 'Look at the glowing atom and pinch.';
+const TEXT_INTRO_PLACE = 'Now bring it to the glowing spot.';
+const TEXT_INTRO_PLACE_NOGUIDE = 'Now bring it next to the floating carbon.';
+const TEXT_FIRST_BOND = "Nice! That's your first bond.";
 
 const ELEMENT_LABEL: Record<ElementSymbol, string> = {
   C: 'carbon (grey)',
@@ -161,6 +185,21 @@ export class MoleculeSystem extends createSystem({
   private ringAge: number[] = [];
   private ringNext = 0;
   private ringGeo!: TorusGeometry;
+  private introDone = false;
+  private introActive = false;
+  private introStage: 'watch' | 'pick' | 'place' = 'watch';
+  private firstBondText = 0;
+  private prevVis: VisibilityState = VisibilityState.NonImmersive;
+  private revealTime = REVEAL_TIME;
+  private lanternT = LANTERN_FADE;
+  private lantern?: LanternGlow;
+  private bead = new GuideBead();
+  private idleTime = 0;
+  private coachAtom?: Entity;
+  private coachSlot = -1;
+  private coachClock = 0;
+  private coachFrom = new Vector3();
+  private coachTarget = new Vector3();
   private guide = new MoleculeGuide();
   private guideOn = true;
   /** Atoms placed this level, not counting the seed. */
@@ -228,13 +267,8 @@ export class MoleculeSystem extends createSystem({
     this.cleanupFuncs.push(
       this.queries.atoms.subscribe('qualify', setup),
       this.queries.held.subscribe('disqualify', release),
-      this.queries.held.subscribe('qualify', (e: Entity) => {
-        this.startTimer();
-        this.setHeldGlow(e, true);
-      }),
-      this.queries.held.subscribe('disqualify', (e: Entity) =>
-        this.setHeldGlow(e, false),
-      ),
+      this.queries.held.subscribe('qualify', (e: Entity) => this.onGrab(e)),
+      this.queries.held.subscribe('disqualify', (e: Entity) => this.onLetGo(e)),
       this.world.visibilityState.subscribe((state) =>
         this.onVisibilityChange(state),
       ),
@@ -272,7 +306,17 @@ export class MoleculeSystem extends createSystem({
       this.ringMats.forEach((m) => m.dispose());
     });
     const room = this.world.getSceneObject<Object3D>('lab-room');
-    if (room) this.cleanupFuncs.push(paintDecor(room));
+    if (room) {
+      this.cleanupFuncs.push(paintDecor(room));
+      this.lantern = new LanternGlow(room);
+    }
+    this.introDone = loadIntroDone();
+    this.prevVis = this.world.visibilityState.peek();
+    const alreadyInVR = this.prevVis === VisibilityState.Visible;
+    this.lanternT = alreadyInVR ? LANTERN_FADE : 0;
+    this.lantern?.setLevel(alreadyInVR ? 1 : LANTERN_DIM);
+    this.world.createTransformEntity(this.bead.mesh);
+    this.cleanupFuncs.push(() => this.bead.dispose());
     this.world.createTransformEntity(this.guide.root);
     this.setupPanel();
 
@@ -284,6 +328,7 @@ export class MoleculeSystem extends createSystem({
 
   /** Clears the current molecule and lays out a level's atoms. */
   private startLevel(index: number, save?: MoleculeSave): void {
+    this.stopCoach();
     for (const bond of Array.from(this.queries.bonds.entities)) bond.dispose();
     this.growing.length = 0;
     this.ringAge.fill(RING_TIME);
@@ -330,6 +375,19 @@ export class MoleculeSystem extends createSystem({
       this.lastScore = scoreOf(this.elapsed, this.mistakes, this.level.starTimeSec);
     }
     this.guide.update(this.filled, this.guideOn);
+    // A fresh level's sketch draws itself once the player is in VR; a restored
+    // one is shown whole. The introduction is only for a brand-new player.
+    const fresh = this.placedCount === 0 && !this.isComplete();
+    if (!this.introDone && (this.levelIndex > 0 || !fresh || save?.timerStarted)) {
+      this.introDone = true;
+      saveIntroDone();
+    }
+    this.introActive = !this.introDone && fresh && this.levelIndex === 0;
+    this.introStage = 'watch';
+    this.firstBondText = 0;
+    this.idleTime = 0;
+    this.revealTime = fresh ? 0 : REVEAL_TIME;
+    this.guide.setReveal(fresh ? 0 : 1);
     // Fresh level: cue fully on. Restored mid-level: no cue at all.
     this.seedCue = this.placedCount === 0 ? 1 : 0;
     this.seedCueClock = 0;
@@ -340,9 +398,203 @@ export class MoleculeSystem extends createSystem({
   }
 
   private instructionText(): string {
+    if (this.firstBondText > 0) return TEXT_FIRST_BOND;
+    if (this.introActive && this.introStage === 'pick') {
+      return this.gazeActive ? TEXT_INTRO_PICK_GAZE : TEXT_INTRO_PICK;
+    }
+    if (this.introActive && this.introStage === 'place') {
+      return this.guideOn ? TEXT_INTRO_PLACE : TEXT_INTRO_PLACE_NOGUIDE;
+    }
     if (this.guideOn) return this.gazeActive ? TEXT_GAZE_GUIDE : TEXT_GUIDE;
     if (this.placedCount === 0) return this.gazeActive ? TEXT_GAZE_START : TEXT_START;
     return this.gazeActive ? TEXT_GAZE_BUILDING : TEXT_BUILDING;
+  }
+
+  private onGrab(e: Entity): void {
+    this.stopCoach();
+    this.idleTime = 0;
+    this.startTimer();
+    this.setHeldGlow(e, true);
+    if (this.introActive && this.introStage !== 'place') {
+      this.introStage = 'place';
+      this.updatePanel();
+    }
+  }
+
+  private onLetGo(e: Entity): void {
+    this.setHeldGlow(e, false);
+    this.idleTime = 0;
+    if (this.introActive && this.introStage === 'place') {
+      this.introStage = 'watch';
+      this.updatePanel();
+    }
+  }
+
+  /** Welcome: a soft chime, lanterns fade up and the sketch starts drawing. */
+  private onEnterVR(): void {
+    if (!this.levelReady) return;
+    this.sfx.welcome();
+    this.lanternT = 0;
+    this.idleTime = 0;
+    const fresh = this.placedCount === 0 && !this.isComplete();
+    this.revealTime = fresh ? 0 : REVEAL_TIME;
+    this.guide.setReveal(fresh ? 0 : 1);
+  }
+
+  /** The first bond: a small joy, once, then the introduction is over. */
+  private afterPlacement(slot: number): void {
+    this.idleTime = 0;
+    if (!this.introActive) return;
+    if (this.bondsDone === 0) {
+      this.introStage = 'watch';
+      return;
+    }
+    this.introActive = false;
+    this.introDone = true;
+    saveIntroDone();
+    this.firstBondText = FIRST_BOND_TEXT_TIME;
+    this.lantern?.flash();
+    this.sfx.sparkle();
+    const p = this.slotWorld[slot];
+    this.tmp2.set(p.x, p.y, p.z + 0.03);
+    this.burst.start(this.tmp2);
+  }
+
+  private updateIntro(delta: number): void {
+    const inVR = this.world.visibilityState.peek() === VisibilityState.Visible;
+    if (this.firstBondText > 0) {
+      this.firstBondText -= delta;
+      if (this.firstBondText <= 0) this.updatePanel();
+    }
+    if (inVR) {
+      if (this.revealTime < REVEAL_TIME) {
+        this.revealTime += delta;
+        this.guide.setReveal(Math.min(1, this.revealTime / REVEAL_TIME));
+      }
+      if (this.lanternT < LANTERN_FADE) {
+        this.lanternT += delta;
+        const k = Math.min(this.lanternT / LANTERN_FADE, 1);
+        this.lantern?.setLevel(LANTERN_DIM + (1 - LANTERN_DIM) * k * (2 - k));
+      }
+    }
+    this.lantern?.update(delta);
+    this.updateCoach(delta, inVR);
+  }
+
+  /**
+   * Invitation: after a moment of stillness one atom "breathes", its target
+   * spot pulses with it, and a bead of light travels between them. Driven by
+   * time only (no hover, no gaze dependence); stops the instant an atom is held.
+   */
+  private updateCoach(delta: number, inVR: boolean): void {
+    if (
+      !inVR ||
+      this.isComplete() ||
+      this.queries.held.entities.size > 0 ||
+      this.pendingReleases.length > 0
+    ) {
+      this.stopCoach();
+      return;
+    }
+    this.idleTime += delta;
+    if (!this.coachAtom) {
+      const breathAt = this.introActive ? INTRO_BREATH_AT : IDLE_BREATH_AT;
+      if (this.idleTime < breathAt) return;
+      if (!this.startCoach()) {
+        this.idleTime = 0;
+        return;
+      }
+    }
+    this.coachClock += delta;
+    const s = 0.5 + 0.5 * Math.sin((this.coachClock / COACH_PERIOD) * Math.PI * 2);
+    const e = this.coachAtom;
+    const obj = e?.object3D;
+    if (!e || !e.active || !obj) {
+      this.stopCoach();
+      return;
+    }
+    if ((e.getValue(Atom, 'tweenTime') ?? -1) < 0) {
+      const home = e.getVectorView(Atom, 'home');
+      this.tmp.set(home[0], home[1] + COACH_BOB * s, home[2]);
+      this.setWorldPosition(obj, this.tmp);
+    }
+    obj.scale.setScalar(1 + COACH_SCALE * s);
+    const mat = this.atomMaterial(obj);
+    if (mat && (e.getValue(Atom, 'flashTime') ?? 0) <= 0) {
+      mat.emissive.setHex(COACH_GLOW);
+      mat.emissiveIntensity = 0.1 + 0.3 * s;
+    }
+    this.guide.setPulse(this.guideOn ? this.coachSlot : -1, s);
+    this.bead.update(delta, this.coachClock >= BEAD_AFTER, this.coachFrom, this.coachTarget);
+  }
+
+  /** Chooses the free atom nearest to an open spot next to what is built. */
+  private startCoach(): boolean {
+    let bestD = Infinity;
+    let bestAtom: Entity | undefined;
+    let bestOpen = -1;
+    let bestPlaced = -1;
+    for (const [a, b] of this.level.bonds) {
+      for (const [placed, open] of [
+        [a, b],
+        [b, a],
+      ]) {
+        if (!this.filled[placed] || this.filled[open]) continue;
+        const spot = this.slotWorld[open];
+        const element = this.level.slots[open].element;
+        for (const e of this.queries.atoms.entities) {
+          if ((e.getValue(Atom, 'slot') ?? -1) >= 0 || e.hasComponent(Grabbed)) continue;
+          if (e.getValue(Atom, 'element') !== element) continue;
+          const home = e.getVectorView(Atom, 'home');
+          const d = Math.hypot(home[0] - spot.x, home[1] - spot.y, home[2] - spot.z);
+          if (d < bestD) {
+            bestD = d;
+            bestAtom = e;
+            bestOpen = open;
+            bestPlaced = placed;
+          }
+        }
+      }
+    }
+    if (!bestAtom) return false;
+    const home = bestAtom.getVectorView(Atom, 'home');
+    this.coachAtom = bestAtom;
+    this.coachSlot = bestOpen;
+    this.coachClock = 0;
+    this.coachFrom.set(home[0], home[1], home[2]);
+    // With the guide off, the bead flies toward the atom it should join.
+    this.coachTarget.copy(this.guideOn ? this.slotWorld[bestOpen] : this.slotWorld[bestPlaced]);
+    if (this.introActive && this.introStage === 'watch') {
+      this.introStage = 'pick';
+      this.updatePanel();
+    }
+    return true;
+  }
+
+  private stopCoach(): void {
+    const e = this.coachAtom;
+    if (!e) return;
+    this.coachAtom = undefined;
+    const obj = e.active ? e.object3D : undefined;
+    if (obj) {
+      obj.scale.setScalar(1);
+      const grabbed = e.hasComponent(Grabbed);
+      const mat = this.atomMaterial(obj);
+      if (mat && !grabbed && (e.getValue(Atom, 'flashTime') ?? 0) <= 0) {
+        mat.emissiveIntensity = 0;
+      }
+      if (
+        !grabbed &&
+        (e.getValue(Atom, 'slot') ?? -1) < 0 &&
+        (e.getValue(Atom, 'tweenTime') ?? -1) < 0
+      ) {
+        const home = e.getVectorView(Atom, 'home');
+        this.tmp.set(home[0], home[1], home[2]);
+        this.setWorldPosition(obj, this.tmp);
+      }
+    }
+    this.guide.setPulse(-1, 0);
+    this.bead.update(0, false, this.coachFrom, this.coachTarget);
   }
 
   private isComplete(): boolean {
@@ -484,6 +736,11 @@ export class MoleculeSystem extends createSystem({
   }
 
   private onVisibilityChange(state: VisibilityState): void {
+    const before = this.prevVis;
+    this.prevVis = state;
+    if (before === VisibilityState.NonImmersive && state === VisibilityState.Visible) {
+      this.onEnterVR();
+    }
     this.paused =
       state === VisibilityState.VisibleBlurred ||
       state === VisibilityState.Hidden;
@@ -686,9 +943,15 @@ export class MoleculeSystem extends createSystem({
     this.ui.header.setProperties({
       backgroundColor: done ? '#9fe0b8' : '#dcebe8',
     });
+    // The introduction lines are shown larger and bolder than ordinary hints.
+    const coachText =
+      this.firstBondText > 0 || (this.introActive && this.introStage !== 'watch');
     this.ui.instructions.setProperties({
       display: done ? 'none' : 'flex',
       text: this.instructionText(),
+      fontSize: coachText ? 27 : 20,
+      fontWeight: coachText ? 700 : 400,
+      color: coachText ? '#1f5a52' : '#2b2b2b',
     });
     this.ui.guideLabel?.setProperties({
       text: this.guideOn ? 'Hide guide' : 'Show guide',
@@ -738,6 +1001,7 @@ export class MoleculeSystem extends createSystem({
     this.burst.update(delta);
     this.updateGazeMode(delta);
     this.updateBondFx(delta);
+    this.updateIntro(delta);
     if (
       this.timerStarted &&
       !this.isComplete() &&
@@ -930,7 +1194,10 @@ export class MoleculeSystem extends createSystem({
     } else if (!restoring) {
       this.sfx.snap(this.placedCount / (this.level.slots.length - 1));
     }
-    if (!restoring) this.persistProgress();
+    if (!restoring) {
+      this.persistProgress();
+      this.afterPlacement(slot);
+    }
     this.guide.update(this.filled, this.guideOn);
     this.updatePanel();
   }
@@ -939,6 +1206,7 @@ export class MoleculeSystem extends createSystem({
     this.returnHome(e);
     this.flash(e, false);
     this.sfx.error();
+    this.idleTime = 0;
     if (!this.isComplete()) this.mistakes++;
     this.persistProgress();
     this.showHint(hint);
@@ -954,6 +1222,7 @@ export class MoleculeSystem extends createSystem({
   /** Quietly sends a free atom home, e.g. when play is paused mid-grab. */
   private setAside(e: Entity): void {
     if ((e.getValue(Atom, 'slot') ?? -1) >= 0) return;
+    this.idleTime = 0;
     this.returnHome(e);
   }
 

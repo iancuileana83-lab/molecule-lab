@@ -18,6 +18,19 @@ export class SoundFx {
     this.tone(BASE_HZ * Math.pow(2, (step + 12) / 12), 0.2, 0.06, 'triangle');
   }
 
+  /** Two soft, low notes when the player enters VR (kept quiet on purpose). */
+  welcome(): void {
+    this.tone(BASE_HZ, 1.0, 0.07, 'sine');
+    this.tone(BASE_HZ * 1.5, 1.2, 0.055, 'sine', undefined, 0.18);
+  }
+
+  /** Three quick high notes for the very first bond. */
+  sparkle(): void {
+    [12, 16, 19].forEach((semi, i) =>
+      this.tone(BASE_HZ * Math.pow(2, semi / 12), 0.35, 0.07, 'sine', undefined, i * 0.08),
+    );
+  }
+
   /** Low, gentle "bonk" for a bond that does not exist. */
   error(): void {
     this.tone(196, 0.22, 0.14, 'triangle', 147);
