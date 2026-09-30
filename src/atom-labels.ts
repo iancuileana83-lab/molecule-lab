@@ -51,6 +51,9 @@ export class AtomLabels {
     s.name = `Label${el}`;
     s.scale.setScalar(LABEL_SIZE);
     s.renderOrder = 10;
+    // Labels are decoration only. Sprite.raycast also throws without a
+    // raycaster camera, which breaks gaze/ray picking of the atom itself.
+    s.raycast = () => {};
     return s;
   }
 

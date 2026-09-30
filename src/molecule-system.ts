@@ -8,7 +8,10 @@ import {
   MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
+  DistanceGrabbable,
+  MovementMode,
   OneHandGrabbable,
+  RayInteractable,
   TorusGeometry,
   UIKit,
   UIKitMLAsset,
@@ -73,6 +76,16 @@ const TEXT_BUILDING =
 
 const TEXT_GUIDE =
   'Pinch an atom and place it on the faint spot of the same color.';
+// Meta VR Glasses: gaze picks the target, a pinch (hand anywhere) acts.
+const TEXT_GAZE_GUIDE =
+  'Look at an atom and pinch to pick it up, then move it onto the faint spot of the same color.';
+const TEXT_GAZE_START =
+  'Look at an atom and pinch to pick it up. Bring it next to the floating carbon; correct bonds snap into place.';
+const TEXT_GAZE_BUILDING =
+  'Keep building: look at an atom, pinch, and bring it next to any atom of the molecule.';
+/** How often the session is checked for a gaze input source. */
+const GAZE_CHECK_INTERVAL = 0.5;
+const HELD_GLOW = 0.25;
 
 const ELEMENT_LABEL: Record<ElementSymbol, string> = {
   C: 'carbon (grey)',
@@ -131,6 +144,9 @@ export class MoleculeSystem extends createSystem({
   private guideOn = true;
   /** Atoms placed this level, not counting the seed. */
   private placedCount = 0;
+  /** True while the XR session offers eye gaze (Meta VR Glasses). */
+  private gazeActive = false;
+  private gazeCheckTimer = 0;
   /** Active play time; runs from the first grab until completion, never while paused. */
   private elapsed = 0;
   private mistakes = 0;
@@ -191,7 +207,13 @@ export class MoleculeSystem extends createSystem({
     this.cleanupFuncs.push(
       this.queries.atoms.subscribe('qualify', setup),
       this.queries.held.subscribe('disqualify', release),
-      this.queries.held.subscribe('qualify', () => this.startTimer()),
+      this.queries.held.subscribe('qualify', (e: Entity) => {
+        this.startTimer();
+        this.setHeldGlow(e, true);
+      }),
+      this.queries.held.subscribe('disqualify', (e: Entity) =>
+        this.setHeldGlow(e, false),
+      ),
       this.world.visibilityState.subscribe((state) =>
         this.onVisibilityChange(state),
       ),
@@ -270,8 +292,73 @@ export class MoleculeSystem extends createSystem({
     this.updatePanel();
   }
 
+  private instructionText(): string {
+    if (this.guideOn) return this.gazeActive ? TEXT_GAZE_GUIDE : TEXT_GUIDE;
+    if (this.placedCount === 0) return this.gazeActive ? TEXT_GAZE_START : TEXT_START;
+    return this.gazeActive ? TEXT_GAZE_BUILDING : TEXT_BUILDING;
+  }
+
   private isComplete(): boolean {
     return this.bondsDone === this.level.bonds.length;
+  }
+
+  /**
+   * One grab mode per atom (IWSDK allows a single grab component): near
+   * pinch on headsets with hands, gaze + pinch distance grab when the
+   * session offers eye gaze. Placed atoms are never grabbable.
+   */
+  private setGrabbable(e: Entity, on: boolean): void {
+    const near = on && !this.gazeActive;
+    const far = on && this.gazeActive;
+    if (!near && e.hasComponent(OneHandGrabbable)) e.removeComponent(OneHandGrabbable);
+    if (!far && e.hasComponent(DistanceGrabbable)) e.removeComponent(DistanceGrabbable);
+    if (!far && e.hasComponent(RayInteractable)) e.removeComponent(RayInteractable);
+    if (near && !e.hasComponent(OneHandGrabbable)) e.addComponent(OneHandGrabbable);
+    if (far) {
+      if (!e.hasComponent(RayInteractable)) e.addComponent(RayInteractable);
+      if (!e.hasComponent(DistanceGrabbable)) {
+        // Moves with the pinching hand's motion; never snaps into the hand.
+        e.addComponent(DistanceGrabbable, {
+          movementMode: MovementMode.MoveAtSource,
+          rotate: false,
+          scale: false,
+          translate: true,
+          returnToOrigin: false,
+        });
+      }
+    }
+  }
+
+  /** Re-checks the XR session for an eye-gaze source and switches grab mode. */
+  private updateGazeMode(delta: number): void {
+    this.gazeCheckTimer -= delta;
+    if (this.gazeCheckTimer > 0) return;
+    this.gazeCheckTimer = GAZE_CHECK_INTERVAL;
+    let gaze = false;
+    const sources = this.world.session?.inputSources;
+    if (sources) {
+      for (let i = 0; i < sources.length; i++) {
+        if (sources[i].targetRayMode === 'gaze') gaze = true;
+      }
+    }
+    if (gaze === this.gazeActive) return;
+    // Wait until nothing is held; the check repeats every GAZE_CHECK_INTERVAL.
+    if (this.queries.held.entities.size > 0) return;
+    this.gazeActive = gaze;
+    // A grab handle is created once per entity, so switching mode in place
+    // would leave the old handle behind. Re-lay the level instead, keeping
+    // placements, time and mistakes through the save.
+    this.persistProgress();
+    this.startLevel(this.levelIndex, loadProgress() ?? undefined);
+  }
+
+  /** A soft glow while an atom is held, so a gaze pick is visibly confirmed. */
+  private setHeldGlow(e: Entity, on: boolean): void {
+    if ((e.getValue(Atom, 'flashTime') ?? 0) > 0) return; // a flash owns the glow
+    const mat = e.object3D ? this.atomMaterial(e.object3D) : undefined;
+    if (!mat) return;
+    mat.emissive.setHex(0xffffff);
+    mat.emissiveIntensity = on ? HELD_GLOW : 0;
   }
 
   private startTimer(): void {
@@ -318,7 +405,7 @@ export class MoleculeSystem extends createSystem({
     obj.position.copy(position);
     const e = this.world.createTransformEntity(obj);
     e.addComponent(Atom, { element, slot });
-    if (slot < 0) e.addComponent(OneHandGrabbable);
+    if (slot < 0) this.setGrabbable(e, true);
     this.setupAtom(e);
     return e;
   }
@@ -459,16 +546,40 @@ export class MoleculeSystem extends createSystem({
     this.bindButton(playAgain, 'play-again-button', () => this.startLevel(0));
   }
 
+  /**
+   * Activates on press-then-release over the button, however long the pinch
+   * lasts. A DOM-style "click" is dropped after ~300 ms, which loses slow or
+   * careful pinches (and gaze + pinch commits), so it is not used here.
+   */
   private bindButton(
     button: UIElement | null,
     name: string,
-    onClick: () => void,
+    onActivate: () => void,
   ): void {
     if (!button) return;
     button.name = name;
-    button.addEventListener('click', onClick);
-    this.cleanupFuncs.push(() => button.removeEventListener('click', onClick));
+    let pressed = false;
+    const onDown = () => {
+      pressed = true;
+    };
+    const onUp = () => {
+      if (!pressed) return;
+      pressed = false;
+      onActivate();
+    };
+    const onLeave = () => {
+      pressed = false;
+    };
+    button.addEventListener('pointerdown', onDown);
+    button.addEventListener('pointerup', onUp);
+    button.addEventListener('pointerleave', onLeave);
+    this.cleanupFuncs.push(() => {
+      button.removeEventListener('pointerdown', onDown);
+      button.removeEventListener('pointerup', onUp);
+      button.removeEventListener('pointerleave', onLeave);
+    });
   }
+
 
   private updateScorePanel(done: boolean): void {
     const ui = this.ui;
@@ -530,11 +641,7 @@ export class MoleculeSystem extends createSystem({
     });
     this.ui.instructions.setProperties({
       display: done ? 'none' : 'flex',
-      text: this.guideOn
-        ? TEXT_GUIDE
-        : this.placedCount === 0
-          ? TEXT_START
-          : TEXT_BUILDING,
+      text: this.instructionText(),
     });
     this.ui.guideLabel?.setProperties({
       text: this.guideOn ? 'Hide guide' : 'Show guide',
@@ -582,6 +689,7 @@ export class MoleculeSystem extends createSystem({
     if (this.paused) return;
     if (this.releaseGrace > 0) this.releaseGrace -= delta;
     this.burst.update(delta);
+    this.updateGazeMode(delta);
     if (
       this.timerStarted &&
       !this.isComplete() &&
@@ -651,7 +759,7 @@ export class MoleculeSystem extends createSystem({
     if (slot >= 0) {
       this.filled[slot] = true;
       this.setWorldPosition(obj, this.slotWorld[slot]);
-      if (e.hasComponent(OneHandGrabbable)) e.removeComponent(OneHandGrabbable);
+      this.setGrabbable(e, false);
     }
   }
 
@@ -733,7 +841,7 @@ export class MoleculeSystem extends createSystem({
     e.setValue(Atom, 'slot', slot);
     this.filled[slot] = true;
     this.placedCount++;
-    if (e.hasComponent(OneHandGrabbable)) e.removeComponent(OneHandGrabbable);
+    this.setGrabbable(e, false);
     if (restoring && e.object3D) {
       this.setWorldPosition(e.object3D, this.slotWorld[slot]);
     } else {

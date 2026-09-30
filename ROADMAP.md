@@ -35,13 +35,15 @@ These apply to every phase. A feature that breaks one of them is not done.
 | 2 | Stars and best score per molecule | done |
 | 3 | Publish to GitHub Pages so testers can open a link | done |
 | 4 | Gaze + pinch support for Meta VR Glasses, fully playable | next |
-| 5 | 2D textbook formula on the panel that lights up as atoms are placed | planned |
-| 6 | Accessibility package | planned |
-| 7 | Medicine cabinet with miniature trophies of completed molecules | planned |
-| 8 | Inspect the finished molecule with one or two hands; pull it apart with two hands to rebuild | planned |
-| 9 | Story moments: caffeine into a coffee cup, aspirin on a willow leaf, paracetamol into a tablet | planned |
-| 10 | Optional: more molecules (ibuprofen, vitamin C, vanillin) with a selection menu | planned |
-| 11 | Real Quest test, demo video under 3 minutes, Devpost submission form | planned |
+| 5 | Visual polish: a warm old apothecary instead of the grey lab | planned |
+| 6 | First 30 seconds: an opening that shows what to do and feels good | planned |
+| 7 | 2D textbook formula on the panel that lights up as atoms are placed | planned |
+| 8 | Accessibility package | planned |
+| 9 | Medicine cabinet with miniature trophies of completed molecules | planned |
+| 10 | Inspect the finished molecule with one or two hands; pull it apart with two hands to rebuild | planned |
+| 11 | Story moments: caffeine into a coffee cup, aspirin on a willow leaf, paracetamol into a tablet | planned |
+| 12 | Optional: more molecules (ibuprofen, vitamin C, vanillin) with a selection menu | planned |
+| 13 | Real Quest test, demo video under 3 minutes, Devpost submission form | planned |
 
 ### Phase details
 
@@ -60,20 +62,29 @@ These apply to every phase. A feature that breaks one of them is not done.
    Pages source is "GitHub Actions". Commits use the GitHub noreply email.
 4. **Gaze + pinch** — the whole game playable on Meta VR Glasses (gaze to target,
    pinch to act).
-5. **Textbook formula** — a 2D skeletal formula on the panel whose atoms light up as
+5. **Visual polish** — turn the grey lab into a warm old pharmacy (apothecary): wood,
+   glass jars on shelves, brass details, warm soft light. Atoms look glossy and
+   pleasant, with a short, satisfying animation each time a bond forms. Everything
+   built from simple shapes and code-generated textures, no downloaded models. Must
+   stay smooth on the headset (few lights, simple geometry), and colour contrast and
+   text must stay easy to read.
+6. **First 30 seconds** — an opening that makes the player understand immediately
+   what to do and feel a small joy, e.g. the first atom discreetly "inviting" the
+   player to grab it; no long tutorial and no hover.
+7. **Textbook formula** — a 2D skeletal formula on the panel whose atoms light up as
    they are placed.
-6. **Accessibility package** — move the table closer/farther, fully playable with one
+8. **Accessibility package** — move the table closer/farther, fully playable with one
    hand, a distinct sound per element, a calm mode without timer, atom letters.
    Aiming for the *Best Accessibility Forward Interaction* bonus award.
-7. **Medicine cabinet** — miniature trophies of completed molecules on the left end
+9. **Medicine cabinet** — miniature trophies of completed molecules on the left end
    of the bench, kept in the save; must not clash with the atom tray or the guide.
-8. **Inspect and take apart** — after completion, grab the molecule with one hand to
+10. **Inspect and take apart** — after completion, grab the molecule with one hand to
    move and rotate it, or two hands to rotate and scale; pull it apart with two hands
    to rebuild.
-9. **Story moments** — 3–5 s animations using a small copy of the finished molecule, so
+11. **Story moments** — 3–5 s animations using a small copy of the finished molecule, so
    the full molecule stays inspectable. Decorative only; no medical or treatment claims.
-10. **More molecules (optional)** — ibuprofen, vitamin C, vanillin, with a selection menu.
-11. **Submission** — real Quest test, demo video under 3 minutes, Devpost form.
+12. **More molecules (optional)** — ibuprofen, vitamin C, vanillin, with a selection menu.
+13. **Submission** — real Quest test, demo video under 3 minutes, Devpost form.
 
 ## Already built (before the numbered phases)
 
