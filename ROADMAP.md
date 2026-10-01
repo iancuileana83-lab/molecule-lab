@@ -37,8 +37,8 @@ These apply to every phase. A feature that breaks one of them is not done.
 | 4 | Gaze + pinch support for Meta VR Glasses, fully playable | done |
 | 5 | Visual polish: a warm old apothecary instead of the grey lab | done |
 | 6 | First 30 seconds: an opening that shows what to do and feels good | done |
-| 7 | 2D textbook formula on the panel that lights up as atoms are placed | next |
-| 8 | Accessibility package | planned |
+| 7 | 2D textbook formula on the panel that lights up as atoms are placed | done |
+| 8 | Accessibility package | next |
 | 9 | Medicine cabinet with miniature trophies of completed molecules | planned |
 | 10 | Inspect the finished molecule with one or two hands; pull it apart with two hands to rebuild | planned |
 | 11 | Story moments: caffeine into a coffee cup, aspirin on a willow leaf, paracetamol into a tablet | planned |
@@ -100,7 +100,17 @@ These apply to every phase. A feature that breaks one of them is not done.
    starts only at the first grab. To see the introduction again, clear the site's
    local data or use a private window.
 7. **Textbook formula** — a 2D skeletal formula on the panel whose atoms light up as
-   they are placed.
+   they are placed. Built: `src/formula-card.ts` draws it on a canvas (reusing the guide's
+   2D coordinates; carbons as dots, O/N as letters with implicit hydrogens such as OH, NH,
+   HO) and the panel shows it through a UIKit `<img>` whose `src` is that texture. Unplaced
+   parts are faint pencil, placed parts take ink (red O, blue N, black bonds once both ends
+   are placed) and the newest atom gets a short golden pulse; it redraws only on change.
+   It is shown only while the guide is on, except that a finished molecule always shows
+   it fully lit as a reward. The panel is taller (542 units in play, 858 when finished) and
+   sits 11 cm higher (y 1.2); checked by calculation that it covers no guide spot of any
+   molecule from any seated head position and that its bottom edge stays about 6.6 cm
+   above the bench. Verified in the emulator: lighting, reload restore, Hide/Show guide,
+   reward with the guide off.
 8. **Accessibility package** — move the table closer/farther, fully playable with one
    hand, a distinct sound per element, a calm mode without timer, atom letters.
    Aiming for the *Best Accessibility Forward Interaction* bonus award.

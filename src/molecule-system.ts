@@ -22,6 +22,7 @@ import { Atom, Bond } from './atom-component.js';
 import { AtomLabels } from './atom-labels.js';
 import { BurstParticles } from './burst-particles.js';
 import { LanternGlow } from './decor-anim.js';
+import { FormulaCard } from './formula-card.js';
 import { paintDecor } from './decor-paint.js';
 import { GuideBead } from './guide-bead.js';
 import { LEVELS } from './levels/all-levels.js';
@@ -185,6 +186,7 @@ export class MoleculeSystem extends createSystem({
   private ringAge: number[] = [];
   private ringNext = 0;
   private ringGeo!: TorusGeometry;
+  private formula = new FormulaCard();
   private introDone = false;
   private introActive = false;
   private introStage: 'watch' | 'pick' | 'place' = 'watch';
@@ -231,6 +233,7 @@ export class MoleculeSystem extends createSystem({
     next: UIElement | null;
     guideLabel: UIKit.Text | null;
     soundLabel: UIKit.Text | null;
+    formulaImg: UIElement | null;
     scoreBox: UIElement | null;
     stars: Array<UIElement | null>;
     scoreText: UIKit.Text | null;
@@ -278,6 +281,7 @@ export class MoleculeSystem extends createSystem({
       () => this.labels.dispose(),
       () => this.burst.dispose(),
       () => this.sfx.dispose(),
+      () => this.formula.dispose(),
     );
     this.guideOn = loadGuidePref();
     this.sfx.muted = !loadSoundPref();
@@ -375,6 +379,8 @@ export class MoleculeSystem extends createSystem({
       this.lastScore = scoreOf(this.elapsed, this.mistakes, this.level.starTimeSec);
     }
     this.guide.update(this.filled, this.guideOn);
+    this.formula.setLevel(this.level);
+    this.formula.update(this.filled);
     // A fresh level's sketch draws itself once the player is in VR; a restored
     // one is shown whole. The introduction is only for a brand-new player.
     const fresh = this.placedCount === 0 && !this.isComplete();
@@ -830,11 +836,13 @@ export class MoleculeSystem extends createSystem({
       next,
       guideLabel: panel.getElementById<UIKit.Text>('guide-label'),
       soundLabel: panel.getElementById<UIKit.Text>('sound-label'),
+      formulaImg: panel.getElementById('formula-img'),
       scoreBox: panel.getElementById('score-box'),
       stars: [1, 2, 3].map((i) => panel.getElementById(`star-${i}`)),
       scoreText: panel.getElementById<UIKit.Text>('score-text'),
       bestText: panel.getElementById<UIKit.Text>('best-text'),
     };
+    this.ui.formulaImg?.setProperties({ src: this.formula.texture });
     this.bindButton(panel.getElementById('restart-button'), 'restart-button', () =>
       this.startLevel(this.levelIndex),
     );
@@ -962,6 +970,10 @@ export class MoleculeSystem extends createSystem({
       fontSize: 19,
     });
     this.ui.factBox.setProperties({ display: done ? 'flex' : 'none' });
+    // The formula follows the guide, and is the reward once the molecule is done.
+    this.ui.formulaImg?.setProperties({
+      display: this.guideOn || done ? 'flex' : 'none',
+    });
     this.updateScorePanel(done);
     this.ui.allDone.setProperties({ display: done && !hasNext ? 'flex' : 'none' });
     this.ui.next?.setProperties({ display: done && hasNext ? 'flex' : 'none' });
@@ -1002,6 +1014,7 @@ export class MoleculeSystem extends createSystem({
     this.updateGazeMode(delta);
     this.updateBondFx(delta);
     this.updateIntro(delta);
+    this.formula.tick(delta);
     if (
       this.timerStarted &&
       !this.isComplete() &&
@@ -1198,6 +1211,7 @@ export class MoleculeSystem extends createSystem({
       this.persistProgress();
       this.afterPlacement(slot);
     }
+    this.formula.update(this.filled, restoring ? -1 : slot);
     this.guide.update(this.filled, this.guideOn);
     this.updatePanel();
   }

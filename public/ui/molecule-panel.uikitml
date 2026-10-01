@@ -173,6 +173,14 @@
     color: #5b6b69;
   }
 
+  .formula-img {
+    width: 386px;
+    height: 180px;
+    margin-top: 12px;
+    margin-left: 22px;
+    margin-right: 22px;
+  }
+
   .enter-button {
     height: 58px;
   }
@@ -215,6 +223,7 @@
     </div>
   </div>
   <div id="game-ui" class="game-ui">
+  <img id="formula-img" class="formula-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="></img>
   <div class="body">
     <div id="instructions" class="instructions">
       Pinch an atom and bring it next to the floating carbon. Correct bonds
