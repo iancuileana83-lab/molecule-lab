@@ -40,8 +40,8 @@ These apply to every phase. A feature that breaks one of them is not done.
 | 7 | 2D textbook formula on the panel that lights up as atoms are placed | done |
 | 8 | Accessibility package | done |
 | 9 | Medicine cabinet with miniature trophies of completed molecules | done |
-| 10 | Inspect the finished molecule with one or two hands; pull it apart with two hands to rebuild | next |
-| 11 | Story moments: caffeine into a coffee cup, aspirin on a willow leaf, paracetamol into a tablet | planned |
+| 10 | Inspect the finished molecule with one or two hands; pull it apart with two hands to rebuild | done |
+| 11 | Story moments: caffeine into a coffee cup, aspirin on a willow leaf, paracetamol into a tablet | next |
 | 12 | Optional: more molecules (ibuprofen, vitamin C, vanillin) with a selection menu | planned |
 | 13 | Real Quest test, demo video under 3 minutes, Devpost submission form | planned |
 
@@ -156,7 +156,21 @@ These apply to every phase. A feature that breaks one of them is not done.
    Trophies are small at that distance; real-device legibility still needs a headset.
 10. **Inspect and take apart** — after completion, grab the molecule with one hand to
    move and rotate it, or two hands to rotate and scale; pull it apart with two hands
-   to rebuild.
+   to rebuild. Built (in `molecule-system.ts`): 1.1 s after completion the atoms and bonds are
+   gathered under one pivot at the molecule's centre with an invisible target sphere around
+   them (placed atoms keep an old grab handle that would swallow the pinch, so their meshes
+   deny the grab pointer). Near pinch uses `TwoHandsGrabbable`: one hand moves and turns it,
+   two hands also resize it (0.7x to 1.6x, forced uniform because the handle scales per
+   axis). With Reach assist or gaze it is a `DistanceGrabbable` (move and turn only). On
+   release it glides back to its place (at once with Reduce motion), so the layout, the
+   panel and the cards never change and the earlier clearance calculations still hold; a
+   held molecule is under the player's own control. Spreading two hands past 1.2x makes the
+   atoms glow amber, past 1.5x the molecule comes apart (sound, sparks unless Reduce
+   motion) and the level restarts like "Build again", with the hint "Taken apart! Build it
+   again." Far-grab players use the Build again button. A hint explains the gesture when
+   the molecule becomes holdable. Verified in the emulator with hand pinch: one-hand move
+   and 60 deg turn then glide home, two-hand resize to 1.3x uniform then home, spread past
+   1.5x restarts the level; no errors. The reload keeps the finished state (still holdable).
 11. **Story moments** — 3–5 s animations using a small copy of the finished molecule, so
    the full molecule stays inspectable. Decorative only; no medical or treatment claims.
 12. **More molecules (optional)** — ibuprofen, vitamin C, vanillin, with a selection menu.

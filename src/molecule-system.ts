@@ -4,6 +4,10 @@ import {
   Entity,
   Grabbed,
   GrabSystem,
+  Group,
+  Quaternion,
+  SphereGeometry,
+  TwoHandsGrabbable,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -126,6 +130,21 @@ const IDLE_BREATH_CALM_AT = 6;
 /** Table placement: the player rig moves, so everything stays together. */
 const TABLE_DISTANCE_STEP: Record<number, number> = { [-1]: -0.15, 0: 0, 1: 0.1 };
 const TABLE_HEIGHT_STEP: Record<number, number> = { [-1]: 0.1, 0: 0, 1: -0.1 };
+/** Inspecting a finished molecule: hold it, turn it, resize it, pull it apart. */
+const INSPECT_DELAY = 1.1;
+const INSPECT_RETURN_TIME = 0.6;
+const INSPECT_SCALE_MIN = 0.7;
+const INSPECT_SCALE_MAX = 1.6;
+/** Spreading two hands past this scale starts to loosen the molecule... */
+const PULL_START = 1.2;
+/** ...and past this scale it comes apart, ready to be rebuilt. */
+const PULL_AT = 1.5;
+const PULL_GLOW = 0xffb347;
+const TEXT_INSPECT =
+  'Pinch the molecule to move and turn it. Two hands resize it; pull them far apart to take it apart.';
+const TEXT_INSPECT_FAR =
+  'Point at the molecule and pinch to move and turn it.';
+const TEXT_TAKEN_APART = 'Taken apart! Build it again.';
 const STILL_COACH_GLOW = 0.4;
 const STILL_RING_OPACITY = 0.75;
 const STILL_SEED_GLOW = 0.08;
@@ -211,6 +230,17 @@ export class MoleculeSystem extends createSystem({
   private ringGeo!: TorusGeometry;
   private formula = new FormulaCard();
   private cabinet = new TrophyCabinet();
+  private inspectPivot?: Group;
+  private inspectEntity?: Entity;
+  private inspectHome = new Vector3();
+  private inspectDelay = INSPECT_DELAY;
+  private inspectHeld = false;
+  /** 0..1 progress of the glide back home after a release; 1 = at home. */
+  private inspectReturn = 1;
+  private inspectFrom = new Vector3();
+  private inspectFromQ = new Quaternion();
+  private inspectFromScale = 1;
+  private pullGlow = 0;
   private introDone = false;
   private introActive = false;
   private introStage: 'watch' | 'pick' | 'place' = 'watch';
@@ -384,6 +414,7 @@ export class MoleculeSystem extends createSystem({
       mat?.dispose(); // per-atom clone made in setupAtom
       atom.dispose();
     }
+    this.teardownInspect();
     this.pendingReleases.length = 0;
     this.hideHint();
 
@@ -737,6 +768,168 @@ export class MoleculeSystem extends createSystem({
   private startTimer(): void {
     if (this.access.calm) return;
     if (!this.timerStarted && !this.isComplete()) this.timerStarted = true;
+  }
+
+  /** Removes the inspection pivot; call after the atoms and bonds are disposed. */
+  private teardownInspect(): void {
+    const e = this.inspectEntity;
+    if (e) {
+      const target = this.inspectPivot?.getObjectByName('InspectTarget') as Mesh | undefined;
+      target?.geometry.dispose();
+      (target?.material as MeshBasicMaterial | undefined)?.dispose();
+      this.world.getSystem(GrabSystem)?.forceRelease(e);
+      e.dispose();
+    }
+    this.inspectEntity = undefined;
+    this.inspectPivot = undefined;
+    this.inspectHeld = false;
+    this.inspectReturn = 1;
+    this.pullGlow = 0;
+    this.inspectDelay = INSPECT_DELAY;
+  }
+
+  /**
+   * Once the molecule has settled, gathers its atoms and bonds under one
+   * pivot at the molecule's centre so it can be held as a single object.
+   * One grab component per entity: near pinch (one hand moves and turns it,
+   * two hands also resize it) or, with far grab, a ray pinch that moves and
+   * turns it. Released, it glides back to its place, so the layout and the
+   * clear view of the panel and cards never change.
+   */
+  private enableInspect(): void {
+    const pivot = new Group();
+    pivot.name = 'MoleculeInspect';
+    this.inspectHome.copy(this.moleculeCenter());
+    pivot.position.copy(this.inspectHome);
+    const entity = this.world.createTransformEntity(pivot);
+    let radius = 0;
+    for (const e of [...this.queries.atoms.entities, ...this.queries.bonds.entities]) {
+      if (e.object3D) pivot.attach(e.object3D);
+    }
+    for (const e of this.queries.atoms.entities) {
+      const obj = e.object3D;
+      if (!obj) continue;
+      radius = Math.max(radius, obj.position.length() + 0.05);
+      // A placed atom keeps its old grab handle, which would swallow the
+      // pinch; let the pinch pass through to the pivot's own target instead.
+      obj.traverse((o) => {
+        o.pointerEventsType = { deny: 'grab' };
+      });
+    }
+    // Invisible target covering the molecule, so a pinch anywhere on or near
+    // it picks the whole molecule up.
+    const target = new Mesh(
+      new SphereGeometry(Math.max(radius, 0.1), 14, 10),
+      new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false }),
+    );
+    target.name = 'InspectTarget';
+    pivot.add(target);
+    if (this.farGrab) {
+      entity.addComponent(RayInteractable);
+      entity.addComponent(DistanceGrabbable, {
+        movementMode: MovementMode.MoveAtSource,
+        rotate: true,
+        scale: false,
+        translate: true,
+        returnToOrigin: false,
+      });
+    } else {
+      entity.addComponent(TwoHandsGrabbable, {
+        translate: true,
+        rotate: true,
+        scale: true,
+        scaleMin: [INSPECT_SCALE_MIN, INSPECT_SCALE_MIN, INSPECT_SCALE_MIN],
+        scaleMax: [INSPECT_SCALE_MAX, INSPECT_SCALE_MAX, INSPECT_SCALE_MAX],
+      });
+    }
+    this.inspectPivot = pivot;
+    this.inspectEntity = entity;
+    this.inspectReturn = 1;
+    this.showHint(this.farGrab ? TEXT_INSPECT_FAR : TEXT_INSPECT);
+  }
+
+  private updateInspect(delta: number): void {
+    const pivot = this.inspectPivot;
+    const entity = this.inspectEntity;
+    if (!pivot || !entity) {
+      if (!this.isComplete() || this.growing.length > 0) {
+        this.inspectDelay = INSPECT_DELAY;
+        return;
+      }
+      this.inspectDelay -= delta;
+      if (this.inspectDelay <= 0) this.enableInspect();
+      return;
+    }
+    if (this.world.visibilityState.peek() !== VisibilityState.Visible) return;
+
+    if (entity.hasComponent(Grabbed)) {
+      if (!this.inspectHeld) {
+        this.inspectHeld = true;
+        this.inspectReturn = 1;
+        this.hideHint();
+        this.sfx.grab('C');
+      }
+      // The grab scales per axis along the hands; keep the molecule undistorted
+      // by using the axis that changed most for all three.
+      const sc = pivot.scale;
+      let s = sc.x;
+      if (Math.abs(sc.y - 1) > Math.abs(s - 1)) s = sc.y;
+      if (Math.abs(sc.z - 1) > Math.abs(s - 1)) s = sc.z;
+      sc.setScalar(s);
+      const k = Math.min(Math.max((s - PULL_START) / (PULL_AT - PULL_START), 0), 1);
+      this.setPullGlow(k);
+      if (k >= 1) this.pullApart();
+      return;
+    }
+    if (this.inspectHeld) {
+      // Let go: glide back to the home pose (at once with Reduce motion).
+      this.inspectHeld = false;
+      this.setPullGlow(0);
+      this.inspectFrom.copy(pivot.position);
+      this.inspectFromQ.copy(pivot.quaternion);
+      this.inspectFromScale = pivot.scale.x;
+      this.inspectReturn = this.access.reduceMotion ? 1 : 0;
+      if (this.access.reduceMotion) this.snapInspectHome();
+    }
+    if (this.inspectReturn < 1) {
+      this.inspectReturn = Math.min(this.inspectReturn + delta / INSPECT_RETURN_TIME, 1);
+      const k = 1 - Math.pow(1 - this.inspectReturn, 3);
+      pivot.position.lerpVectors(this.inspectFrom, this.inspectHome, k);
+      pivot.quaternion.copy(this.inspectFromQ).slerp(this.qIdentity, k);
+      pivot.scale.setScalar(this.inspectFromScale + (1 - this.inspectFromScale) * k);
+    }
+  }
+
+  private qIdentity = new Quaternion();
+
+  private snapInspectHome(): void {
+    const pivot = this.inspectPivot;
+    if (!pivot) return;
+    pivot.position.copy(this.inspectHome);
+    pivot.quaternion.identity();
+    pivot.scale.setScalar(1);
+  }
+
+  /** Warm glow on every atom as two hands pull the molecule toward breaking. */
+  private setPullGlow(k: number): void {
+    if (Math.abs(k - this.pullGlow) < 0.01 && !(k === 0 && this.pullGlow !== 0)) return;
+    this.pullGlow = k;
+    for (const e of this.queries.atoms.entities) {
+      if ((e.getValue(Atom, 'flashTime') ?? 0) > 0) continue;
+      const mat = e.object3D ? this.atomMaterial(e.object3D) : undefined;
+      if (!mat) continue;
+      mat.emissive.setHex(k > 0 ? PULL_GLOW : 0xffffff);
+      mat.emissiveIntensity = k * 0.7;
+    }
+  }
+
+  /** Two hands pulled the molecule apart: start the level over, ready to rebuild. */
+  private pullApart(): void {
+    if (!this.access.reduceMotion) this.burst.start(this.moleculeCenter());
+    this.sfx.error();
+    this.startLevel(this.levelIndex);
+    this.persistProgress();
+    this.showHint(TEXT_TAKEN_APART);
   }
 
   /** Puts the finished molecule's miniature in the cabinet and saves it. */
@@ -1206,6 +1399,7 @@ export class MoleculeSystem extends createSystem({
     this.updateIntro(delta);
     this.formula.tick(delta);
     this.cabinet.update(delta);
+    this.updateInspect(delta);
     if (
       this.timerStarted &&
       !this.access.calm &&
