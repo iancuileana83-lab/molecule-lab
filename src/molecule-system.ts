@@ -33,6 +33,7 @@ import {
   DEFAULT_ACCESS,
   loadAccess,
   loadBestScores,
+  loadCabinet,
   loadGuidePref,
   loadIntroDone,
   loadProgress,
@@ -40,6 +41,7 @@ import {
   loadSoundPref,
   saveAccess,
   saveBestScores,
+  saveCabinet,
   saveGuidePref,
   saveIntroDone,
   saveProgress,
@@ -52,6 +54,7 @@ import {
 } from './scene-assets/atoms.scene-asset.js';
 import { formatTime, isBetter, Score, scoreOf, starBreakdown } from './scoring.js';
 import { SoundFx } from './sound-fx.js';
+import { TrophyCabinet } from './trophy-cabinet.js';
 
 /** Metres per angstrom when laying a template out in front of the player. */
 const SCALE = 0.068;
@@ -207,6 +210,7 @@ export class MoleculeSystem extends createSystem({
   private ringNext = 0;
   private ringGeo!: TorusGeometry;
   private formula = new FormulaCard();
+  private cabinet = new TrophyCabinet();
   private introDone = false;
   private introActive = false;
   private introStage: 'watch' | 'pick' | 'place' = 'watch';
@@ -314,6 +318,7 @@ export class MoleculeSystem extends createSystem({
       () => this.burst.dispose(),
       () => this.sfx.dispose(),
       () => this.formula.dispose(),
+      () => this.cabinet.dispose(),
     );
     this.guideOn = loadGuidePref();
     this.sfx.muted = !loadSoundPref();
@@ -357,6 +362,8 @@ export class MoleculeSystem extends createSystem({
     this.world.createTransformEntity(this.bead.mesh);
     this.cleanupFuncs.push(() => this.bead.dispose());
     this.world.createTransformEntity(this.guide.root);
+    this.world.createTransformEntity(this.cabinet.root);
+    this.cabinet.setOwned(loadCabinet());
     this.setupPanel();
 
     this.bestScores = loadBestScores();
@@ -412,6 +419,7 @@ export class MoleculeSystem extends createSystem({
     if (save) this.restorePlacements(save.placements);
     this.completedCalm = false;
     if (this.isComplete()) {
+      this.addTrophy(false);
       this.completedCalm = this.access.calm;
       if (!this.completedCalm) {
         this.lastScore = scoreOf(this.elapsed, this.mistakes, this.level.starTimeSec);
@@ -729,6 +737,14 @@ export class MoleculeSystem extends createSystem({
   private startTimer(): void {
     if (this.access.calm) return;
     if (!this.timerStarted && !this.isComplete()) this.timerStarted = true;
+  }
+
+  /** Puts the finished molecule's miniature in the cabinet and saves it. */
+  private addTrophy(announce: boolean): void {
+    if (this.cabinet.has(this.level.id)) return;
+    this.cabinet.add(this.level.id, announce && !this.access.reduceMotion);
+    saveCabinet(this.cabinet.ownedIds());
+    if (announce) this.showHint('A trophy was added to the cabinet on your left.');
   }
 
   /** Stops the clock, scores the run and keeps the best result per molecule. */
@@ -1189,6 +1205,7 @@ export class MoleculeSystem extends createSystem({
     this.updateBondFx(delta);
     this.updateIntro(delta);
     this.formula.tick(delta);
+    this.cabinet.update(delta);
     if (
       this.timerStarted &&
       !this.access.calm &&
@@ -1379,6 +1396,7 @@ export class MoleculeSystem extends createSystem({
       this.sfx.complete();
       if (!this.access.reduceMotion) this.burst.start(this.moleculeCenter());
       this.finishRun();
+      this.addTrophy(true);
       console.info(`[Molecule Lab] ${this.level.name} complete!`);
     } else if (!restoring) {
       this.sfx.snap(

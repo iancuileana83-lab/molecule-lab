@@ -165,3 +165,24 @@ export function saveAccess(a: AccessSettings): void {
     // Settings simply are not persisted on this device.
   }
 }
+
+const CABINET_KEY = 'molecule-lab:cabinet:v1';
+
+/** Ids of the molecules whose trophy stands in the medicine cabinet. */
+export function loadCabinet(): string[] {
+  try {
+    const raw = localStorage.getItem(CABINET_KEY);
+    const data = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(data) ? data.filter((v): v is string => typeof v === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCabinet(ids: string[]): void {
+  try {
+    localStorage.setItem(CABINET_KEY, JSON.stringify(ids));
+  } catch {
+    // Trophies simply are not persisted on this device.
+  }
+}

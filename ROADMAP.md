@@ -39,8 +39,8 @@ These apply to every phase. A feature that breaks one of them is not done.
 | 6 | First 30 seconds: an opening that shows what to do and feels good | done |
 | 7 | 2D textbook formula on the panel that lights up as atoms are placed | done |
 | 8 | Accessibility package | done |
-| 9 | Medicine cabinet with miniature trophies of completed molecules | next |
-| 10 | Inspect the finished molecule with one or two hands; pull it apart with two hands to rebuild | planned |
+| 9 | Medicine cabinet with miniature trophies of completed molecules | done |
+| 10 | Inspect the finished molecule with one or two hands; pull it apart with two hands to rebuild | next |
 | 11 | Story moments: caffeine into a coffee cup, aspirin on a willow leaf, paracetamol into a tablet | planned |
 | 12 | Optional: more molecules (ibuprofen, vitamin C, vanillin) with a selection menu | planned |
 | 13 | Real Quest test, demo video under 3 minutes, Devpost submission form | planned |
@@ -137,8 +137,23 @@ These apply to every phase. A feature that breaks one of them is not done.
    at the panel centre, the whole panel fits the glasses' view in most head positions
    (worst case right at the 25 deg limit); glancing at its lower third can still cut the
    title on the glasses, which is harmless. Real-device comfort still needs a headset.
-9. **Medicine cabinet** — miniature trophies of completed molecules on the left end
-   of the bench, kept in the save; must not clash with the atom tray or the guide.
+9. **Medicine cabinet** — miniature trophies of completed molecules, kept in the save.
+   Built: `src/trophy-cabinet.ts`, a walnut chest of drawers with a glass display case on
+   top (x -1.24..-0.66, z -0.98..-0.80, floor to 1.66 m), standing just left of the bench
+   (the bench's own left end sits under the info card, so it could not go there). Three
+   shelf spots, one per molecule in level order; an empty spot shows a faint brass ring, a
+   finished molecule a small copy (about 17 cm for paracetamol) of its atoms and bonds with a
+   short pop (none with Reduce motion), and the panel hint says a trophy was added.
+   Completed molecules are saved in `molecule-lab:cabinet:v1` (calm-mode completions count;
+   a restored finished level adds its trophy too). Decorative only, nothing to grab or touch.
+   Checked by calculation (243 head positions, 3 table settings, all molecules): 43 cm
+   between the cabinet and the nearest atom or guide spot, 0 of 88,695 sight lines to atoms
+   or spots blocked, 25 cm from the info card and 89 cm from the panel in plan view, at
+   least 4.4 deg sideways gap between the molecule and the cabinet, and all trophy sight
+   lines clear of the card and panel (they are about 44 deg to the left at most and 4 deg
+   below to 14 deg above eye level, so the player turns the head). Verified in the emulator:
+   paracetamol finished with hand pinch, trophy shown, saved, kept after reload, no errors.
+   Trophies are small at that distance; real-device legibility still needs a headset.
 10. **Inspect and take apart** — after completion, grab the molecule with one hand to
    move and rotate it, or two hands to rotate and scale; pull it apart with two hands
    to rebuild.
