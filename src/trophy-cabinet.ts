@@ -6,19 +6,12 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  Object3D,
   TorusGeometry,
-  Vector3,
 } from '@iwsdk/core';
 import { LEVELS } from './levels/all-levels.js';
-import type { ElementSymbol, MoleculeLevel } from './levels/types.js';
+import { buildMiniMolecule, createBondParts } from './mini-molecule.js';
 import { GeoBatch } from './scene-assets/lib/geo-batch.js';
 import { makeWoodTexture } from './scene-assets/lib/proc-textures.js';
-import {
-  carbonAtom,
-  nitrogenAtom,
-  oxygenAtom,
-} from './scene-assets/atoms.scene-asset.js';
 
 /**
  * Medicine cabinet: a tall walnut chest just left of the bench with a glass
@@ -37,17 +30,15 @@ const WIDTH = 0.58;
 const CHEST_TOP = 1.31;
 const CASE_TOP = 1.65;
 const SLOT_DX = 0.19;
-/** Metres per angstrom for a trophy (the build plane uses 0.068). */
-const TROPHY_SCALE = 0.033;
-const ATOM_K = 0.33;
-const BOND_RADIUS = 0.0026;
+/**
+ * Metres per angstrom for a trophy (the build plane uses 0.068). With 0.023 the
+ * widest molecule (paracetamol, 7.5 angstrom) is 17 cm, so all three fit side by
+ * side in the 54 cm case with the 19 cm slot spacing.
+ */
+const TROPHY_SCALE = 0.023;
+const ATOM_K = 0.35;
+const BOND_RADIUS = 0.0022;
 const POP_TIME = 0.6;
-
-const PROTOTYPES: Record<ElementSymbol, Object3D> = {
-  C: carbonAtom,
-  N: nitrogenAtom,
-  O: oxygenAtom,
-};
 
 export class TrophyCabinet {
   readonly root = new Group();
@@ -56,13 +47,7 @@ export class TrophyCabinet {
   private readonly owned = new Set<string>();
   private readonly pop: number[] = [];
   private readonly disposables: Array<{ dispose(): void }> = [];
-  private readonly bondGeo = new CylinderGeometry(BOND_RADIUS, BOND_RADIUS, 1, 8);
-  private readonly bondMat = new MeshStandardMaterial({ color: 0xd9dde0, roughness: 0.4 });
-  private readonly up = new Vector3(0, 1, 0);
-  private readonly dir = new Vector3();
-  private readonly side = new Vector3();
-  private readonly a = new Vector3();
-  private readonly b = new Vector3();
+  private readonly bonds = createBondParts();
 
   constructor() {
     this.root.name = 'TrophyCabinet';
@@ -75,7 +60,7 @@ export class TrophyCabinet {
       ghost.position.set(x, CHEST_TOP + 0.014, FRONT_Z - DEPTH / 2);
       this.root.add(ghost);
       this.ghosts.push(ghost);
-      const trophy = this.buildTrophy(level);
+      const trophy = buildMiniMolecule(level, TROPHY_SCALE, ATOM_K, BOND_RADIUS, this.bonds, 0.012);
       trophy.name = `Trophy-${level.id}`;
       trophy.position.set(x, CHEST_TOP + 0.03, FRONT_Z - DEPTH / 2);
       trophy.visible = false;
@@ -83,7 +68,7 @@ export class TrophyCabinet {
       this.trophies.push(trophy);
       this.pop.push(POP_TIME);
     });
-    this.disposables.push(this.bondGeo, this.bondMat);
+    this.disposables.push(this.bonds.geo, this.bonds.mat);
   }
 
   private readonly ghostGeo = new TorusGeometry(0.06, 0.0018, 6, 36);
@@ -143,40 +128,6 @@ export class TrophyCabinet {
     for (const d of this.disposables) d.dispose();
     this.ghostGeo.dispose();
     this.ghostMat.dispose();
-  }
-
-  private buildTrophy(level: MoleculeLevel): Group {
-    const g = new Group();
-    const xs = level.slots.map((s) => s.x);
-    const ys = level.slots.map((s) => s.y);
-    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
-    const minY = Math.min(...ys);
-    const pos = level.slots.map(
-      (s) =>
-        new Vector3((s.x - cx) * TROPHY_SCALE, (s.y - minY) * TROPHY_SCALE + 0.012, 0),
-    );
-    level.slots.forEach((s, i) => {
-      const atom = PROTOTYPES[s.element].clone();
-      atom.scale.setScalar(ATOM_K);
-      atom.position.copy(pos[i]);
-      g.add(atom);
-    });
-    for (const [ia, ib, order] of level.bonds) {
-      this.a.copy(pos[ia]);
-      this.b.copy(pos[ib]);
-      this.dir.subVectors(this.b, this.a);
-      const length = this.dir.length();
-      this.dir.normalize();
-      this.side.crossVectors(this.dir, new Vector3(0, 0, 1)).normalize().multiplyScalar(0.0045);
-      for (const o of order === 2 ? [1, -1] : [0]) {
-        const stick = new Mesh(this.bondGeo, this.bondMat);
-        stick.position.addVectors(this.a, this.b).multiplyScalar(0.5).addScaledVector(this.side, o);
-        stick.quaternion.setFromUnitVectors(this.up, this.dir);
-        stick.scale.set(1, length, 1);
-        g.add(stick);
-      }
-    }
-    return g;
   }
 
   private buildFurniture(): void {

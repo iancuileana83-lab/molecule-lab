@@ -58,6 +58,7 @@ import {
 } from './scene-assets/atoms.scene-asset.js';
 import { formatTime, isBetter, Score, scoreOf, starBreakdown } from './scoring.js';
 import { SoundFx } from './sound-fx.js';
+import { StoryMoment } from './story-moment.js';
 import { TrophyCabinet } from './trophy-cabinet.js';
 
 /** Metres per angstrom when laying a template out in front of the player. */
@@ -145,6 +146,8 @@ const TEXT_INSPECT =
 const TEXT_INSPECT_FAR =
   'Point at the molecule and pinch to move and turn it.';
 const TEXT_TAKEN_APART = 'Taken apart! Build it again.';
+/** Seconds after completion before the story moment starts (after the sparks). */
+const STORY_DELAY = 0.8;
 const STILL_COACH_GLOW = 0.4;
 const STILL_RING_OPACITY = 0.75;
 const STILL_SEED_GLOW = 0.08;
@@ -230,6 +233,7 @@ export class MoleculeSystem extends createSystem({
   private ringGeo!: TorusGeometry;
   private formula = new FormulaCard();
   private cabinet = new TrophyCabinet();
+  private story = new StoryMoment();
   private inspectPivot?: Group;
   private inspectEntity?: Entity;
   private inspectHome = new Vector3();
@@ -349,6 +353,7 @@ export class MoleculeSystem extends createSystem({
       () => this.sfx.dispose(),
       () => this.formula.dispose(),
       () => this.cabinet.dispose(),
+      () => this.story.dispose(),
     );
     this.guideOn = loadGuidePref();
     this.sfx.muted = !loadSoundPref();
@@ -393,6 +398,7 @@ export class MoleculeSystem extends createSystem({
     this.cleanupFuncs.push(() => this.bead.dispose());
     this.world.createTransformEntity(this.guide.root);
     this.world.createTransformEntity(this.cabinet.root);
+    this.world.createTransformEntity(this.story.root);
     this.cabinet.setOwned(loadCabinet());
     this.setupPanel();
 
@@ -415,6 +421,7 @@ export class MoleculeSystem extends createSystem({
       atom.dispose();
     }
     this.teardownInspect();
+    this.story.stop();
     this.pendingReleases.length = 0;
     this.hideHint();
 
@@ -1400,6 +1407,7 @@ export class MoleculeSystem extends createSystem({
     this.formula.tick(delta);
     this.cabinet.update(delta);
     this.updateInspect(delta);
+    this.story.update(delta);
     if (
       this.timerStarted &&
       !this.access.calm &&
@@ -1591,6 +1599,8 @@ export class MoleculeSystem extends createSystem({
       if (!this.access.reduceMotion) this.burst.start(this.moleculeCenter());
       this.finishRun();
       this.addTrophy(true);
+      // Decorative story moment; skipped with Reduce motion.
+      if (!this.access.reduceMotion) this.story.play(this.level.id, STORY_DELAY);
       console.info(`[Molecule Lab] ${this.level.name} complete!`);
     } else if (!restoring) {
       this.sfx.snap(

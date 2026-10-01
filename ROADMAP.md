@@ -41,8 +41,8 @@ These apply to every phase. A feature that breaks one of them is not done.
 | 8 | Accessibility package | done |
 | 9 | Medicine cabinet with miniature trophies of completed molecules | done |
 | 10 | Inspect the finished molecule with one or two hands; pull it apart with two hands to rebuild | done |
-| 11 | Story moments: caffeine into a coffee cup, aspirin on a willow leaf, paracetamol into a tablet | next |
-| 12 | Optional: more molecules (ibuprofen, vitamin C, vanillin) with a selection menu | planned |
+| 11 | Story moments: caffeine into a coffee cup, aspirin on a willow leaf, paracetamol into a tablet | done |
+| 12 | Optional: more molecules (ibuprofen, vitamin C, vanillin) with a selection menu | next |
 | 13 | Real Quest test, demo video under 3 minutes, Devpost submission form | planned |
 
 ### Phase details
@@ -142,7 +142,7 @@ These apply to every phase. A feature that breaks one of them is not done.
    top (x -1.24..-0.66, z -0.98..-0.80, floor to 1.66 m), standing just left of the bench
    (the bench's own left end sits under the info card, so it could not go there). Three
    shelf spots, one per molecule in level order; an empty spot shows a faint brass ring, a
-   finished molecule a small copy (about 17 cm for paracetamol) of its atoms and bonds with a
+   finished molecule a small copy (17 cm for paracetamol, 14 and 13 cm for aspirin and caffeine, 0.023 m per angstrom, so the three never overlap in the 54 cm case; the first version was 1.4x too big and was fixed in phase 11) of its atoms and bonds with a
    short pop (none with Reduce motion), and the panel hint says a trophy was added.
    Completed molecules are saved in `molecule-lab:cabinet:v1` (calm-mode completions count;
    a restored finished level adds its trophy too). Decorative only, nothing to grab or touch.
@@ -173,6 +173,19 @@ These apply to every phase. A feature that breaks one of them is not done.
    1.5x restarts the level; no errors. The reload keeps the finished state (still holdable).
 11. **Story moments** — 3–5 s animations using a small copy of the finished molecule, so
    the full molecule stays inspectable. Decorative only; no medical or treatment claims.
+   Built: `src/story-moment.ts` (with `src/mini-molecule.ts`, shared with the cabinet). 0.8 s
+   after a molecule is finished, a 4.4 s scene plays on the bench in front of the molecule
+   (where the atom tray was): a small copy of the molecule hovers and sways above an everyday
+   object, then is taken in and the scene shrinks away. Caffeine: a teal coffee cup with
+   rising steam. Aspirin: a willow leaf that sways and dips when the copy lands. Paracetamol:
+   a coral tablet that pulses. No text, nothing to touch, no claims about use or treatment.
+   Skipped with Reduce motion; not replayed when a finished level is restored. The objects
+   are 1.3x life size so they read from the seat. Checked by calculation (243 head
+   positions): the scene occupies x +-0.16, z -0.52..-0.32, and its top stays at or below
+   0.92 m while the molecule's lowest edge is 0.933 m, so 0 of 46,170 sight lines to the
+   molecule or guide spots are blocked; it is 2 cm clear of the panel and 6 cm of the info
+   card in plan view (their nearest corners are higher up). Verified in the emulator by
+   stepping the paused ECS: all three scenes show correctly, no console errors.
 12. **More molecules (optional)** — ibuprofen, vitamin C, vanillin, with a selection menu.
 13. **Submission** — real Quest test, demo video under 3 minutes, Devpost form.
 

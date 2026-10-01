@@ -46,3 +46,7 @@ pids/
 
 # Local AI-tool config with machine-specific paths
 opencode.json
+
+# local test scratch
+.scratch/
+artifacts/
