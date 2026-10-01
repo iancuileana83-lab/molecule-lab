@@ -1,0 +1,123 @@
+<!--
+  Molecule Lab info card, shown on the left once a molecule is finished: the fact
+  and the score. Display only; nothing here is pressed. Runtime ids: card-title,
+  fact-text, score-box, star-1..3, score-text, best-text, calm-text.
+-->
+<style>
+  .card-root {
+    flex-direction: column;
+    width: 380px;
+    padding-bottom: 18px;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: center;
+    padding-top: 14px;
+    padding-bottom: 12px;
+    background-color: #9fe0b8;
+  }
+
+  .card-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1f2a2a;
+  }
+
+  .fact-box {
+    flex-direction: column;
+    margin-top: 12px;
+    margin-left: 18px;
+    margin-right: 18px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    padding-left: 14px;
+    padding-right: 14px;
+    border-radius: 12px;
+    background-color: #eef7f1;
+  }
+
+  .fact-text {
+    font-size: 19px;
+    line-height: 1.35;
+    color: #1f3a2c;
+  }
+
+  .score-box {
+    flex-direction: column;
+    align-items: center;
+    margin-top: 12px;
+  }
+
+  .stars-row {
+    flex-direction: row;
+    gap: 26px;
+  }
+
+  .star-cell {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .star-icon {
+    width: 40px;
+    height: 40px;
+    color: #c9ccc8;
+  }
+
+  .star-label {
+    margin-top: 2px;
+    font-size: 15px;
+    color: #4a5a58;
+  }
+
+  .score-text {
+    margin-top: 6px;
+    font-size: 19px;
+    font-weight: 600;
+    color: #1f2a2a;
+  }
+
+  .best-text {
+    margin-top: 2px;
+    font-size: 17px;
+    color: #2e5f58;
+  }
+
+  .calm-text {
+    margin-top: 12px;
+    font-size: 19px;
+    font-weight: 600;
+    color: #2e5f58;
+    text-align: center;
+  }
+</style>
+<Panel class="card-root">
+  <div class="card-header">
+    <div id="card-title" class="card-title">Did you know?</div>
+  </div>
+  <div class="fact-box">
+    <div id="fact-text" class="fact-text">Fact</div>
+  </div>
+  <div id="score-box" class="score-box">
+    <div class="stars-row">
+      <div class="star-cell">
+        <Star id="star-1" class="star-icon"></Star>
+        <div class="star-label">Built</div>
+      </div>
+      <div class="star-cell">
+        <Star id="star-2" class="star-icon"></Star>
+        <div class="star-label">Time</div>
+      </div>
+      <div class="star-cell">
+        <Star id="star-3" class="star-icon"></Star>
+        <div class="star-label">Precision</div>
+      </div>
+    </div>
+    <div id="score-text" class="score-text">Time 0:00 | Mistakes 0</div>
+    <div id="best-text" class="best-text">Best: -</div>
+  </div>
+  <div id="calm-text" class="calm-text" style="display: none">
+    Completed in calm mode
+  </div>
+</Panel>

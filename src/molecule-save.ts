@@ -115,3 +115,53 @@ export function saveProgress(save: MoleculeSave): void {
     // Progress simply is not persisted on this device.
   }
 }
+
+/** Accessibility options, kept together in one small save. */
+export interface AccessSettings {
+  /** No timer, no mistake count, no Time/Precision stars. */
+  calm: boolean;
+  /** No pulses, sparks, rings or travelling light; static cues only. */
+  reduceMotion: boolean;
+  /** Grab atoms from a distance with the hand ray (Quest); gaze devices always do. */
+  reach: boolean;
+  /** Table distance: -1 near, 0 normal, 1 far. */
+  tableDistance: -1 | 0 | 1;
+  /** Table height: -1 lower, 0 normal, 1 higher. */
+  tableHeight: -1 | 0 | 1;
+}
+
+export const DEFAULT_ACCESS: AccessSettings = {
+  calm: false,
+  reduceMotion: false,
+  reach: false,
+  tableDistance: 0,
+  tableHeight: 0,
+};
+
+const ACCESS_KEY = 'molecule-lab:access:v1';
+
+const level = (v: unknown): -1 | 0 | 1 => (v === -1 || v === 1 ? v : 0);
+
+export function loadAccess(): AccessSettings {
+  try {
+    const raw = localStorage.getItem(ACCESS_KEY);
+    const d = raw ? (JSON.parse(raw) as Partial<AccessSettings>) : {};
+    return {
+      calm: d.calm === true,
+      reduceMotion: d.reduceMotion === true,
+      reach: d.reach === true,
+      tableDistance: level(d.tableDistance),
+      tableHeight: level(d.tableHeight),
+    };
+  } catch {
+    return { ...DEFAULT_ACCESS };
+  }
+}
+
+export function saveAccess(a: AccessSettings): void {
+  try {
+    localStorage.setItem(ACCESS_KEY, JSON.stringify(a));
+  } catch {
+    // Settings simply are not persisted on this device.
+  }
+}

@@ -133,14 +133,14 @@
       },
       "transform": {
         "position": [
-          0.52,
-          1.2,
-          -0.3
+          0.5,
+          1,
+          -0.35
         ],
         "rotationDeg": [
-          -15,
-          -50,
-          0
+          -26.57,
+          -41.81,
+          -18.43
         ],
         "scale": 0.1
       },
@@ -153,6 +153,27 @@
           "width": "26vw",
           "height": "50%"
         }
+      }
+    },
+    {
+      "id": "info-card",
+      "name": "Info Card",
+      "content": {
+        "type": "asset",
+        "asset": "info-card"
+      },
+      "transform": {
+        "position": [
+          -0.5,
+          1,
+          -0.35
+        ],
+        "rotationDeg": [
+          -26.57,
+          41.81,
+          18.43
+        ],
+        "scale": 0.1
       }
     }
   ]

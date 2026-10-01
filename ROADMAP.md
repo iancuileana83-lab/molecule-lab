@@ -38,8 +38,8 @@ These apply to every phase. A feature that breaks one of them is not done.
 | 5 | Visual polish: a warm old apothecary instead of the grey lab | done |
 | 6 | First 30 seconds: an opening that shows what to do and feels good | done |
 | 7 | 2D textbook formula on the panel that lights up as atoms are placed | done |
-| 8 | Accessibility package | next |
-| 9 | Medicine cabinet with miniature trophies of completed molecules | planned |
+| 8 | Accessibility package | done |
+| 9 | Medicine cabinet with miniature trophies of completed molecules | next |
 | 10 | Inspect the finished molecule with one or two hands; pull it apart with two hands to rebuild | planned |
 | 11 | Story moments: caffeine into a coffee cup, aspirin on a willow leaf, paracetamol into a tablet | planned |
 | 12 | Optional: more molecules (ibuprofen, vitamin C, vanillin) with a selection menu | planned |
@@ -106,14 +106,37 @@ These apply to every phase. A feature that breaks one of them is not done.
    parts are faint pencil, placed parts take ink (red O, blue N, black bonds once both ends
    are placed) and the newest atom gets a short golden pulse; it redraws only on change.
    It is shown only while the guide is on, except that a finished molecule always shows
-   it fully lit as a reward. The panel is taller (542 units in play, 858 when finished) and
-   sits 11 cm higher (y 1.2); checked by calculation that it covers no guide spot of any
+   it fully lit as a reward. The panel was made taller then (542 units in play, 858 when
+   finished, y 1.2; reworked in phase 8); checked by calculation that it covers no guide spot of any
    molecule from any seated head position and that its bottom edge stays about 6.6 cm
    above the bench. Verified in the emulator: lighting, reload restore, Hide/Show guide,
    reward with the guide off.
-8. **Accessibility package** — move the table closer/farther, fully playable with one
-   hand, a distinct sound per element, a calm mode without timer, atom letters.
-   Aiming for the *Best Accessibility Forward Interaction* bonus award.
+8. **Accessibility package** — aiming for the *Best Accessibility Forward Interaction*
+   bonus award. Built: a Settings page on the panel (Settings / Back to the game) with
+   Hide guide, Mute, Calm mode, Reduce motion, Reach assist, Table Near/Normal/Far and
+   Height Lower/Normal/Higher; all saved (`molecule-lab:access:v1`). **Calm mode**: no
+   timer, mistakes not counted, no Time/Precision stars, records untouched, the finished
+   card says "Completed in calm mode", the invitation appears after 6 s instead of 12.
+   **Reduce motion**: no pulsing, bobbing, sparks, bond rings, travelling light, lantern
+   flash or sketch drawing; only static highlights (steady glow on the suggested atom and
+   spot, steady start ring). **Reach assist**: hand-ray distance grab on Quest (gaze
+   devices always have it); the level is laid out again through the save. **Table**:
+   moves the player rig (-15 / 0 / +10 cm distance, +10 / 0 / -10 cm for Lower / Normal /
+   Higher), so the table, atoms, molecule and panels stay together. **One hand**: every
+   action is a single pinch with either hand (tested with the left hand only).
+   **Sound per element**: carbon round and middle, oxygen lower and warm, nitrogen higher
+   and bright, on pick-up and on placement. Atom letters were already there (phase 1).
+   **Panel redesign** (the header went out of view when looking down, and Meta VR Glasses
+   see only 25 deg up / 43 deg down): the panel is compact (about 454 units in play and
+   when finished, 436 in Settings, was 542 / 858) and sits lower (y 1.0, about 49 deg
+   from straight ahead instead of 60) tilted to face the seat without roll; the fact and
+   the score moved to a separate **info card** on the left (same height and angle),
+   shown only when a molecule is finished. Checked by calculation, for all three
+   molecules (guide spots and tray atoms), 64 seated head positions and 7 table settings:
+   neither the panel (0.52 m) nor the card (0.44 m) blocks any atom or guide spot. Looking
+   at the panel centre, the whole panel fits the glasses' view in most head positions
+   (worst case right at the 25 deg limit); glancing at its lower third can still cut the
+   title on the glasses, which is harmless. Real-device comfort still needs a headset.
 9. **Medicine cabinet** — miniature trophies of completed molecules on the left end
    of the bench, kept in the save; must not clash with the atom tray or the guide.
 10. **Inspect and take apart** — after completion, grab the molecule with one hand to

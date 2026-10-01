@@ -26,4 +26,9 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Molecule Panel',
   },
+  'info-card': {
+    url: publicAssetUrl('ui/info-card.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Info Card',
+  },
 });

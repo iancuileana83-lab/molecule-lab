@@ -1,3 +1,5 @@
+import type { ElementSymbol } from './levels/types.js';
+
 /**
  * Tiny synthesized sound effects (Web Audio, no audio files), so every sound
  * is original. The AudioContext is created lazily on first use; browsers let
@@ -11,11 +13,36 @@ export class SoundFx {
   private master?: GainNode;
   muted = false;
 
-  /** Soft bell-like "ding"; `progress` (0..1) raises the pitch as the molecule grows. */
-  snap(progress: number): void {
+  /**
+   * Each element has its own voice, so atoms can be told apart by ear:
+   * carbon is round and middle, oxygen lower and warm, nitrogen higher and bright.
+   */
+  private static readonly VOICE: Record<
+    ElementSymbol,
+    { ratio: number; type: OscillatorType; overtone: number }
+  > = {
+    C: { ratio: 1, type: 'sine', overtone: 0.06 },
+    O: { ratio: 0.75, type: 'triangle', overtone: 0.03 },
+    N: { ratio: 1.335, type: 'sine', overtone: 0.1 },
+  };
+
+  /** A short, soft note when an atom is picked up. */
+  grab(element: ElementSymbol): void {
+    const v = SoundFx.VOICE[element];
+    this.tone(BASE_HZ * v.ratio, 0.2, 0.13, v.type);
+    this.tone(BASE_HZ * v.ratio * 2, 0.14, v.overtone, 'sine');
+  }
+
+  /**
+   * Soft bell-like "ding"; `progress` (0..1) raises the pitch as the molecule
+   * grows, and the placed atom's element colours the voice.
+   */
+  snap(progress: number, element: ElementSymbol = 'C'): void {
+    const v = SoundFx.VOICE[element];
     const step = PENTATONIC[Math.round(progress * (PENTATONIC.length - 1))];
-    this.tone(BASE_HZ * Math.pow(2, step / 12), 0.35, 0.22, 'sine');
-    this.tone(BASE_HZ * Math.pow(2, (step + 12) / 12), 0.2, 0.06, 'triangle');
+    const hz = BASE_HZ * v.ratio * Math.pow(2, step / 12);
+    this.tone(hz, 0.35, 0.22, v.type);
+    this.tone(hz * 2, 0.2, v.overtone * 2, 'triangle');
   }
 
   /** Two soft, low notes when the player enters VR (kept quiet on purpose). */

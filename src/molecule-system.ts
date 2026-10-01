@@ -29,12 +29,16 @@ import { LEVELS } from './levels/all-levels.js';
 import type { ElementSymbol, MoleculeLevel } from './levels/types.js';
 import { MoleculeGuide } from './molecule-guide.js';
 import {
+  AccessSettings,
+  DEFAULT_ACCESS,
+  loadAccess,
   loadBestScores,
   loadGuidePref,
   loadIntroDone,
   loadProgress,
   MoleculeSave,
   loadSoundPref,
+  saveAccess,
   saveBestScores,
   saveGuidePref,
   saveIntroDone,
@@ -89,6 +93,13 @@ const TEXT_GAZE_START =
   'Look at an atom and pinch to pick it up. Bring it next to the floating carbon; correct bonds snap into place.';
 const TEXT_GAZE_BUILDING =
   'Keep building: look at an atom, pinch, and bring it next to any atom of the molecule.';
+// Reach assist on Quest: the hand ray picks the target, a pinch grabs it.
+const TEXT_REACH_GUIDE =
+  'Point at an atom and pinch to pick it up, then move it onto the faint spot of the same color.';
+const TEXT_REACH_START =
+  'Point at an atom and pinch to pick it up. Bring it next to the floating carbon; correct bonds snap into place.';
+const TEXT_REACH_BUILDING =
+  'Keep building: point at an atom, pinch, and bring it next to any atom of the molecule.';
 /** How often the session is checked for a gaze input source. */
 const GAZE_CHECK_INTERVAL = 0.5;
 const HELD_GLOW = 0.25;
@@ -107,6 +118,14 @@ const LANTERN_DIM = 0.55;
 /** Seconds of stillness before the glowing-atom invitation starts. */
 const INTRO_BREATH_AT = 3;
 const IDLE_BREATH_AT = 12;
+/** Calm mode offers the hint sooner. */
+const IDLE_BREATH_CALM_AT = 6;
+/** Table placement: the player rig moves, so everything stays together. */
+const TABLE_DISTANCE_STEP: Record<number, number> = { [-1]: -0.15, 0: 0, 1: 0.1 };
+const TABLE_HEIGHT_STEP: Record<number, number> = { [-1]: 0.1, 0: 0, 1: -0.1 };
+const STILL_COACH_GLOW = 0.4;
+const STILL_RING_OPACITY = 0.75;
+const STILL_SEED_GLOW = 0.08;
 /** The bead starts this long after the atom begins to glow. */
 const BEAD_AFTER = 2;
 const COACH_PERIOD = 1.4;
@@ -116,6 +135,7 @@ const COACH_GLOW = 0xffc860;
 const FIRST_BOND_TEXT_TIME = 4;
 const TEXT_INTRO_PICK = 'Pick up the glowing atom.';
 const TEXT_INTRO_PICK_GAZE = 'Look at the glowing atom and pinch.';
+const TEXT_INTRO_PICK_REACH = 'Point at the glowing atom and pinch.';
 const TEXT_INTRO_PLACE = 'Now bring it to the glowing spot.';
 const TEXT_INTRO_PLACE_NOGUIDE = 'Now bring it next to the floating carbon.';
 const TEXT_FIRST_BOND = "Nice! That's your first bond.";
@@ -218,6 +238,24 @@ export class MoleculeSystem extends createSystem({
   private newBest = false;
   /** False until the first level is laid out; guards saves during init. */
   private levelReady = false;
+  private access: AccessSettings = { ...DEFAULT_ACCESS };
+  private settingsOpen = false;
+  /** True when the finished molecule was built in calm mode (no score shown). */
+  private completedCalm = false;
+  private card?: Object3D;
+  private cardUi?: {
+    factText: UIKit.Text | null;
+    scoreBox: UIElement | null;
+    stars: Array<UIElement | null>;
+    scoreText: UIKit.Text | null;
+    bestText: UIKit.Text | null;
+    calmText: UIElement | null;
+  };
+  private settingsUi?: {
+    playPage: UIElement | null;
+    settingsPage: UIElement | null;
+    toggles: Record<string, { button: UIElement | null; label: UIKit.Text | null }>;
+  };
   private sfx = new SoundFx();
   private labels!: AtomLabels;
   private burst!: BurstParticles;
@@ -227,17 +265,11 @@ export class MoleculeSystem extends createSystem({
     progress: UIKit.Text;
     hint: UIKit.Text;
     instructions: UIKit.Text;
-    factBox: UIElement;
-    factText: UIKit.Text;
     allDone: UIElement;
     next: UIElement | null;
     guideLabel: UIKit.Text | null;
     soundLabel: UIKit.Text | null;
     formulaImg: UIElement | null;
-    scoreBox: UIElement | null;
-    stars: Array<UIElement | null>;
-    scoreText: UIKit.Text | null;
-    bestText: UIKit.Text | null;
     playAgain: UIElement | null;
   };
 
@@ -285,6 +317,8 @@ export class MoleculeSystem extends createSystem({
     );
     this.guideOn = loadGuidePref();
     this.sfx.muted = !loadSoundPref();
+    this.access = loadAccess();
+    this.applyTable();
     this.labels = new AtomLabels();
     this.burst = new BurstParticles();
     this.world.createTransformEntity(this.burst.points);
@@ -317,8 +351,9 @@ export class MoleculeSystem extends createSystem({
     this.introDone = loadIntroDone();
     this.prevVis = this.world.visibilityState.peek();
     const alreadyInVR = this.prevVis === VisibilityState.Visible;
-    this.lanternT = alreadyInVR ? LANTERN_FADE : 0;
-    this.lantern?.setLevel(alreadyInVR ? 1 : LANTERN_DIM);
+    const lit = alreadyInVR || this.access.reduceMotion;
+    this.lanternT = lit ? LANTERN_FADE : 0;
+    this.lantern?.setLevel(lit ? 1 : LANTERN_DIM);
     this.world.createTransformEntity(this.bead.mesh);
     this.cleanupFuncs.push(() => this.bead.dispose());
     this.world.createTransformEntity(this.guide.root);
@@ -375,8 +410,12 @@ export class MoleculeSystem extends createSystem({
     });
 
     if (save) this.restorePlacements(save.placements);
+    this.completedCalm = false;
     if (this.isComplete()) {
-      this.lastScore = scoreOf(this.elapsed, this.mistakes, this.level.starTimeSec);
+      this.completedCalm = this.access.calm;
+      if (!this.completedCalm) {
+        this.lastScore = scoreOf(this.elapsed, this.mistakes, this.level.starTimeSec);
+      }
     }
     this.guide.update(this.filled, this.guideOn);
     this.formula.setLevel(this.level);
@@ -392,8 +431,9 @@ export class MoleculeSystem extends createSystem({
     this.introStage = 'watch';
     this.firstBondText = 0;
     this.idleTime = 0;
-    this.revealTime = fresh ? 0 : REVEAL_TIME;
-    this.guide.setReveal(fresh ? 0 : 1);
+    const draw = fresh && !this.access.reduceMotion;
+    this.revealTime = draw ? 0 : REVEAL_TIME;
+    this.guide.setReveal(draw ? 0 : 1);
     // Fresh level: cue fully on. Restored mid-level: no cue at all.
     this.seedCue = this.placedCount === 0 ? 1 : 0;
     this.seedCueClock = 0;
@@ -404,16 +444,20 @@ export class MoleculeSystem extends createSystem({
   }
 
   private instructionText(): string {
+    const gaze = this.gazeActive;
+    const reach = !gaze && this.access.reach;
     if (this.firstBondText > 0) return TEXT_FIRST_BOND;
     if (this.introActive && this.introStage === 'pick') {
-      return this.gazeActive ? TEXT_INTRO_PICK_GAZE : TEXT_INTRO_PICK;
+      return gaze ? TEXT_INTRO_PICK_GAZE : reach ? TEXT_INTRO_PICK_REACH : TEXT_INTRO_PICK;
     }
     if (this.introActive && this.introStage === 'place') {
       return this.guideOn ? TEXT_INTRO_PLACE : TEXT_INTRO_PLACE_NOGUIDE;
     }
-    if (this.guideOn) return this.gazeActive ? TEXT_GAZE_GUIDE : TEXT_GUIDE;
-    if (this.placedCount === 0) return this.gazeActive ? TEXT_GAZE_START : TEXT_START;
-    return this.gazeActive ? TEXT_GAZE_BUILDING : TEXT_BUILDING;
+    if (this.guideOn) return gaze ? TEXT_GAZE_GUIDE : reach ? TEXT_REACH_GUIDE : TEXT_GUIDE;
+    if (this.placedCount === 0) {
+      return gaze ? TEXT_GAZE_START : reach ? TEXT_REACH_START : TEXT_START;
+    }
+    return gaze ? TEXT_GAZE_BUILDING : reach ? TEXT_REACH_BUILDING : TEXT_BUILDING;
   }
 
   private onGrab(e: Entity): void {
@@ -421,6 +465,7 @@ export class MoleculeSystem extends createSystem({
     this.idleTime = 0;
     this.startTimer();
     this.setHeldGlow(e, true);
+    this.sfx.grab(e.getValue(Atom, 'element') as ElementSymbol);
     if (this.introActive && this.introStage !== 'place') {
       this.introStage = 'place';
       this.updatePanel();
@@ -440,11 +485,12 @@ export class MoleculeSystem extends createSystem({
   private onEnterVR(): void {
     if (!this.levelReady) return;
     this.sfx.welcome();
-    this.lanternT = 0;
+    this.lanternT = this.access.reduceMotion ? LANTERN_FADE : 0;
     this.idleTime = 0;
     const fresh = this.placedCount === 0 && !this.isComplete();
-    this.revealTime = fresh ? 0 : REVEAL_TIME;
-    this.guide.setReveal(fresh ? 0 : 1);
+    const draw = fresh && !this.access.reduceMotion;
+    this.revealTime = draw ? 0 : REVEAL_TIME;
+    this.guide.setReveal(draw ? 0 : 1);
   }
 
   /** The first bond: a small joy, once, then the introduction is over. */
@@ -459,8 +505,9 @@ export class MoleculeSystem extends createSystem({
     this.introDone = true;
     saveIntroDone();
     this.firstBondText = FIRST_BOND_TEXT_TIME;
-    this.lantern?.flash();
     this.sfx.sparkle();
+    if (this.access.reduceMotion) return;
+    this.lantern?.flash();
     const p = this.slotWorld[slot];
     this.tmp2.set(p.x, p.y, p.z + 0.03);
     this.burst.start(this.tmp2);
@@ -504,7 +551,11 @@ export class MoleculeSystem extends createSystem({
     }
     this.idleTime += delta;
     if (!this.coachAtom) {
-      const breathAt = this.introActive ? INTRO_BREATH_AT : IDLE_BREATH_AT;
+      const breathAt = this.introActive
+        ? INTRO_BREATH_AT
+        : this.access.calm
+          ? IDLE_BREATH_CALM_AT
+          : IDLE_BREATH_AT;
       if (this.idleTime < breathAt) return;
       if (!this.startCoach()) {
         this.idleTime = 0;
@@ -512,7 +563,9 @@ export class MoleculeSystem extends createSystem({
       }
     }
     this.coachClock += delta;
-    const s = 0.5 + 0.5 * Math.sin((this.coachClock / COACH_PERIOD) * Math.PI * 2);
+    // Reduce motion keeps a steady highlight instead of a pulse.
+    const still = this.access.reduceMotion;
+    const s = still ? 1 : 0.5 + 0.5 * Math.sin((this.coachClock / COACH_PERIOD) * Math.PI * 2);
     const e = this.coachAtom;
     const obj = e?.object3D;
     if (!e || !e.active || !obj) {
@@ -521,17 +574,19 @@ export class MoleculeSystem extends createSystem({
     }
     if ((e.getValue(Atom, 'tweenTime') ?? -1) < 0) {
       const home = e.getVectorView(Atom, 'home');
-      this.tmp.set(home[0], home[1] + COACH_BOB * s, home[2]);
+      this.tmp.set(home[0], home[1] + (still ? 0 : COACH_BOB * s), home[2]);
       this.setWorldPosition(obj, this.tmp);
     }
-    obj.scale.setScalar(1 + COACH_SCALE * s);
+    obj.scale.setScalar(still ? 1 : 1 + COACH_SCALE * s);
     const mat = this.atomMaterial(obj);
     if (mat && (e.getValue(Atom, 'flashTime') ?? 0) <= 0) {
       mat.emissive.setHex(COACH_GLOW);
-      mat.emissiveIntensity = 0.1 + 0.3 * s;
+      mat.emissiveIntensity = still ? STILL_COACH_GLOW : 0.1 + 0.3 * s;
     }
-    this.guide.setPulse(this.guideOn ? this.coachSlot : -1, s);
-    this.bead.update(delta, this.coachClock >= BEAD_AFTER, this.coachFrom, this.coachTarget);
+    this.guide.setPulse(this.guideOn ? this.coachSlot : -1, still ? 0.8 : s);
+    if (!still) {
+      this.bead.update(delta, this.coachClock >= BEAD_AFTER, this.coachFrom, this.coachTarget);
+    }
   }
 
   /** Chooses the free atom nearest to an open spot next to what is built. */
@@ -607,14 +662,19 @@ export class MoleculeSystem extends createSystem({
     return this.bondsDone === this.level.bonds.length;
   }
 
+  /** Distance grab: gaze + pinch (glasses) or the hand ray with Reach assist. */
+  private get farGrab(): boolean {
+    return this.gazeActive || this.access.reach;
+  }
+
   /**
    * One grab mode per atom (IWSDK allows a single grab component): near
    * pinch on headsets with hands, gaze + pinch distance grab when the
    * session offers eye gaze. Placed atoms are never grabbable.
    */
   private setGrabbable(e: Entity, on: boolean): void {
-    const near = on && !this.gazeActive;
-    const far = on && this.gazeActive;
+    const near = on && !this.farGrab;
+    const far = on && this.farGrab;
     if (!near && e.hasComponent(OneHandGrabbable)) e.removeComponent(OneHandGrabbable);
     if (!far && e.hasComponent(DistanceGrabbable)) e.removeComponent(DistanceGrabbable);
     if (!far && e.hasComponent(RayInteractable)) e.removeComponent(RayInteractable);
@@ -667,11 +727,19 @@ export class MoleculeSystem extends createSystem({
   }
 
   private startTimer(): void {
+    if (this.access.calm) return;
     if (!this.timerStarted && !this.isComplete()) this.timerStarted = true;
   }
 
   /** Stops the clock, scores the run and keeps the best result per molecule. */
   private finishRun(): void {
+    this.completedCalm = this.access.calm;
+    if (this.completedCalm) {
+      // Calm mode: nothing is timed or scored, and the records stay untouched.
+      this.lastScore = undefined;
+      this.newBest = false;
+      return;
+    }
     const score = scoreOf(this.elapsed, this.mistakes, this.level.starTimeSec);
     this.lastScore = score;
     this.newBest = isBetter(score, this.bestScores[this.level.id]);
@@ -729,16 +797,17 @@ export class MoleculeSystem extends createSystem({
   }
 
   private applySeedCue(): void {
+    const still = this.access.reduceMotion;
     const pulse = 0.5 + 0.5 * Math.sin(this.seedCueClock * SEED_CUE_PULSE);
     this.seedRing.visible = this.seedCue > 0;
-    this.seedRingMat.opacity = this.seedCue * (0.55 + 0.35 * pulse);
+    this.seedRingMat.opacity = this.seedCue * (still ? STILL_RING_OPACITY : 0.55 + 0.35 * pulse);
     const seed = this.seed;
     // A running success/error flash owns the seed's emissive meanwhile.
     if (!seed?.object3D || (seed.getValue(Atom, 'flashTime') ?? 0) > 0) return;
     const mat = this.atomMaterial(seed.object3D);
     if (!mat) return;
     mat.emissive.setHex(SEED_GLOW_COLOR);
-    mat.emissiveIntensity = this.seedCue * (0.03 + 0.09 * pulse);
+    mat.emissiveIntensity = this.seedCue * (still ? STILL_SEED_GLOW : 0.03 + 0.09 * pulse);
   }
 
   private onVisibilityChange(state: VisibilityState): void {
@@ -750,6 +819,9 @@ export class MoleculeSystem extends createSystem({
     this.paused =
       state === VisibilityState.VisibleBlurred ||
       state === VisibilityState.Hidden;
+    this.settingsOpen = false;
+    this.applyTable();
+    if (this.levelReady) this.updatePanel();
     // Hands vanish and reappear around a pause; never judge those releases.
     this.releaseGrace = RELEASE_GRACE;
     if (state === VisibilityState.Visible) return;
@@ -807,55 +879,77 @@ export class MoleculeSystem extends createSystem({
     const progress = panel.getElementById<UIKit.Text>('progress');
     const hint = panel.getElementById<UIKit.Text>('hint');
     const instructions = panel.getElementById<UIKit.Text>('instructions');
-    const factBox = panel.getElementById('fact-box');
-    const factText = panel.getElementById<UIKit.Text>('fact-text');
     const allDone = panel.getElementById('all-done');
-    if (
-      !header ||
-      !levelName ||
-      !progress ||
-      !hint ||
-      !instructions ||
-      !factBox ||
-      !factText ||
-      !allDone
-    )
-      return;
-    const next = panel.getElementById('next-button');
-    const playAgain = panel.getElementById('play-again-button');
+    if (!header || !levelName || !progress || !hint || !instructions || !allDone) return;
     this.ui = {
-      playAgain,
+      playAgain: panel.getElementById('play-again-button'),
       header,
       levelName,
       progress,
       hint,
       instructions,
-      factBox,
-      factText,
       allDone,
-      next,
+      next: panel.getElementById('next-button'),
       guideLabel: panel.getElementById<UIKit.Text>('guide-label'),
       soundLabel: panel.getElementById<UIKit.Text>('sound-label'),
       formulaImg: panel.getElementById('formula-img'),
-      scoreBox: panel.getElementById('score-box'),
-      stars: [1, 2, 3].map((i) => panel.getElementById(`star-${i}`)),
-      scoreText: panel.getElementById<UIKit.Text>('score-text'),
-      bestText: panel.getElementById<UIKit.Text>('best-text'),
     };
     this.ui.formulaImg?.setProperties({ src: this.formula.texture });
-    this.bindButton(panel.getElementById('restart-button'), 'restart-button', () =>
-      this.startLevel(this.levelIndex),
-    );
-    this.bindButton(panel.getElementById('guide-button'), 'guide-button', () =>
-      this.setGuide(!this.guideOn),
-    );
-    this.bindButton(panel.getElementById('sound-button'), 'sound-button', () =>
-      this.setSound(this.sfx.muted),
-    );
-    this.bindButton(next, 'next-button', () => {
+
+    // The fact and the score live on the separate card on the left.
+    const card = this.world.getSceneObject<UIKitMLAsset>('info-card');
+    if (card) {
+      this.card = card as unknown as Object3D;
+      this.card.visible = false;
+      this.cardUi = {
+        factText: card.getElementById<UIKit.Text>('fact-text'),
+        scoreBox: card.getElementById('score-box'),
+        stars: [1, 2, 3].map((i) => card.getElementById(`star-${i}`)),
+        scoreText: card.getElementById<UIKit.Text>('score-text'),
+        bestText: card.getElementById<UIKit.Text>('best-text'),
+        calmText: card.getElementById('calm-text'),
+      };
+    }
+
+    const toggles: NonNullable<MoleculeSystem['settingsUi']>['toggles'] = {};
+    const addToggle = (key: string, buttonId: string, labelId: string) => {
+      toggles[key] = {
+        button: panel.getElementById(buttonId),
+        label: panel.getElementById<UIKit.Text>(labelId),
+      };
+    };
+    addToggle('calm', 'calm-button', 'calm-label');
+    addToggle('motion', 'motion-button', 'motion-label');
+    addToggle('reach', 'reach-button', 'reach-label');
+    for (const id of ['dist-near', 'dist-normal', 'dist-far', 'height-low', 'height-normal', 'height-high']) {
+      addToggle(id, id, `${id}-label`);
+    }
+    this.settingsUi = {
+      playPage: panel.getElementById('play-page'),
+      settingsPage: panel.getElementById('settings-page'),
+      toggles,
+    };
+
+    const bind = (id: string, onActivate: () => void) =>
+      this.bindButton(panel.getElementById(id), id, onActivate);
+    bind('restart-button', () => this.startLevel(this.levelIndex));
+    bind('settings-button', () => this.setSettingsOpen(true));
+    bind('back-button', () => this.setSettingsOpen(false));
+    bind('guide-button', () => this.setGuide(!this.guideOn));
+    bind('sound-button', () => this.setSound(this.sfx.muted));
+    bind('calm-button', () => this.setAccess({ calm: !this.access.calm }));
+    bind('motion-button', () => this.setAccess({ reduceMotion: !this.access.reduceMotion }));
+    bind('reach-button', () => this.setAccess({ reach: !this.access.reach }));
+    bind('dist-near', () => this.setAccess({ tableDistance: -1 }));
+    bind('dist-normal', () => this.setAccess({ tableDistance: 0 }));
+    bind('dist-far', () => this.setAccess({ tableDistance: 1 }));
+    bind('height-low', () => this.setAccess({ tableHeight: -1 }));
+    bind('height-normal', () => this.setAccess({ tableHeight: 0 }));
+    bind('height-high', () => this.setAccess({ tableHeight: 1 }));
+    bind('next-button', () => {
       if (this.levelIndex < LEVELS.length - 1) this.startLevel(this.levelIndex + 1);
     });
-    this.bindButton(playAgain, 'play-again-button', () => this.startLevel(0));
+    bind('play-again-button', () => this.startLevel(0));
   }
 
   /**
@@ -893,12 +987,18 @@ export class MoleculeSystem extends createSystem({
   }
 
 
-  private updateScorePanel(done: boolean): void {
-    const ui = this.ui;
+  /** Fact and score on the left card; it is only shown once the molecule is done. */
+  private updateCard(done: boolean): void {
+    const inVR = this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
+    if (this.card) this.card.visible = done && inVR;
+    const ui = this.cardUi;
     if (!ui) return;
+    ui.factText?.setProperties({ text: this.level.fact });
     const score = this.lastScore;
-    ui.scoreBox?.setProperties({ display: done && score ? 'flex' : 'none' });
-    if (!done || !score) return;
+    const calm = this.completedCalm;
+    ui.calmText?.setProperties({ display: done && calm ? 'flex' : 'none' });
+    ui.scoreBox?.setProperties({ display: done && !calm && score ? 'flex' : 'none' });
+    if (!done || calm || !score) return;
     const b = starBreakdown(score.timeSec, score.mistakes, this.level.starTimeSec);
     [b.built, b.time, b.precision].forEach((lit, i) =>
       ui.stars[i]?.setProperties({ color: lit ? '#f2b705' : '#c9ccc8' }),
@@ -914,6 +1014,79 @@ export class MoleculeSystem extends createSystem({
           ? `Best: ${best.stars} ${best.stars === 1 ? 'star' : 'stars'}, ${formatTime(best.timeSec)}`
           : '',
     });
+  }
+
+  private setSettingsOpen(open: boolean): void {
+    this.settingsOpen = open;
+    this.updatePanel();
+  }
+
+  /**
+   * Moves the player rig, not the objects, so the table, atoms, molecule and
+   * panels all stay in the same place relative to each other.
+   */
+  private applyTable(): void {
+    this.world.player.position.set(
+      0,
+      TABLE_HEIGHT_STEP[this.access.tableHeight],
+      TABLE_DISTANCE_STEP[this.access.tableDistance],
+    );
+  }
+
+  /** Applies, saves and reflects one or more accessibility options. */
+  private setAccess(change: Partial<AccessSettings>): void {
+    const before = this.access;
+    this.access = { ...before, ...change };
+    saveAccess(this.access);
+    if (this.access.tableDistance !== before.tableDistance || this.access.tableHeight !== before.tableHeight) {
+      this.applyTable();
+    }
+    if (this.access.reduceMotion !== before.reduceMotion) {
+      // Static cues only: drop any running pulse and show the lanterns steadily.
+      this.stopCoach();
+      if (this.access.reduceMotion) {
+        this.lanternT = LANTERN_FADE;
+        this.lantern?.setLevel(1);
+        this.ringAge.fill(RING_TIME);
+        this.rings.forEach((r) => (r.visible = false));
+      }
+    }
+    if (this.access.calm !== before.calm) this.idleTime = 0;
+    if (this.access.reach !== before.reach) {
+      // The grab handle is made once per atom, so lay the level out again.
+      this.persistProgress();
+      this.startLevel(this.levelIndex, loadProgress() ?? undefined);
+      return;
+    }
+    this.updatePanel();
+  }
+
+  /** Marks a settings button as the chosen one. */
+  private styleToggle(key: string, on: boolean, text?: string): void {
+    const t = this.settingsUi?.toggles[key];
+    if (!t) return;
+    if (text !== undefined) t.label?.setProperties({ text });
+    // Chosen = light green with dark text; otherwise the kit's dark button.
+    t.button?.setProperties({ backgroundColor: on ? '#bfe3cd' : '#2b3036' });
+    t.label?.setProperties({
+      fontWeight: on ? 700 : 400,
+      color: on ? '#102a1c' : '#ffffff',
+      fontSize: text === undefined ? 17 : 16,
+    });
+  }
+
+  private refreshSettings(): void {
+    const a = this.access;
+    const onOff = (v: boolean) => (v ? 'On' : 'Off');
+    this.styleToggle('calm', a.calm, `Calm mode: ${onOff(a.calm)}`);
+    this.styleToggle('motion', a.reduceMotion, `Reduce motion: ${onOff(a.reduceMotion)}`);
+    this.styleToggle('reach', a.reach, `Reach assist: ${onOff(a.reach)}`);
+    this.styleToggle('dist-near', a.tableDistance === -1);
+    this.styleToggle('dist-normal', a.tableDistance === 0);
+    this.styleToggle('dist-far', a.tableDistance === 1);
+    this.styleToggle('height-low', a.tableHeight === -1);
+    this.styleToggle('height-normal', a.tableHeight === 0);
+    this.styleToggle('height-high', a.tableHeight === 1);
   }
 
   private setSound(on: boolean): void {
@@ -938,9 +1111,11 @@ export class MoleculeSystem extends createSystem({
     const hasNext = this.levelIndex < LEVELS.length - 1;
     const atomsToPlace = this.level.slots.length - 1; // the seed is given
     this.ui.levelName.setProperties({
-      text: `Level ${this.levelIndex + 1}: ${this.level.name}`,
+      text: this.settingsOpen ? 'Settings' : `Level ${this.levelIndex + 1}: ${this.level.name}`,
     });
-    this.ui.factText.setProperties({ text: this.level.fact });
+    this.settingsUi?.playPage?.setProperties({ display: this.settingsOpen ? 'none' : 'flex' });
+    this.settingsUi?.settingsPage?.setProperties({ display: this.settingsOpen ? 'flex' : 'none' });
+    this.refreshSettings();
     this.ui.progress.setProperties({
       text: done
         ? `${this.level.name} complete!`
@@ -969,12 +1144,11 @@ export class MoleculeSystem extends createSystem({
       text: this.sfx.muted ? 'Unmute' : 'Mute',
       fontSize: 19,
     });
-    this.ui.factBox.setProperties({ display: done ? 'flex' : 'none' });
     // The formula follows the guide, and is the reward once the molecule is done.
     this.ui.formulaImg?.setProperties({
       display: this.guideOn || done ? 'flex' : 'none',
     });
-    this.updateScorePanel(done);
+    this.updateCard(done);
     this.ui.allDone.setProperties({ display: done && !hasNext ? 'flex' : 'none' });
     this.ui.next?.setProperties({ display: done && hasNext ? 'flex' : 'none' });
     this.ui.playAgain?.setProperties({
@@ -1017,6 +1191,7 @@ export class MoleculeSystem extends createSystem({
     this.formula.tick(delta);
     if (
       this.timerStarted &&
+      !this.access.calm &&
       !this.isComplete() &&
       this.world.visibilityState.peek() === VisibilityState.Visible
     ) {
@@ -1178,7 +1353,7 @@ export class MoleculeSystem extends createSystem({
     if (restoring && e.object3D) {
       this.setWorldPosition(e.object3D, this.slotWorld[slot]);
     } else {
-      e.setValue(Atom, 'popTime', 0);
+      if (!this.access.reduceMotion) e.setValue(Atom, 'popTime', 0);
       this.startTween(e, this.slotWorld[slot], SNAP_TIME);
       this.flash(e, true);
       this.hideHint();
@@ -1187,8 +1362,9 @@ export class MoleculeSystem extends createSystem({
     for (const [a, b, order] of this.level.bonds) {
       const other = a === slot ? b : b === slot ? a : -1;
       if (other >= 0 && this.filled[other]) {
-        this.spawnBond(this.slotWorld[slot], this.slotWorld[other], order, !restoring);
-        if (!restoring) {
+        const lively = !restoring && !this.access.reduceMotion;
+        this.spawnBond(this.slotWorld[slot], this.slotWorld[other], order, lively);
+        if (lively) {
           const p = this.slotWorld[slot];
           const q = this.slotWorld[other];
           this.emitRing((p.x + q.x) / 2, (p.y + q.y) / 2, (p.z + q.z) / 2 + 0.045);
@@ -1201,17 +1377,20 @@ export class MoleculeSystem extends createSystem({
     if (!restoring && complete) {
       for (const atom of this.queries.atoms.entities) this.flash(atom, true);
       this.sfx.complete();
-      this.burst.start(this.moleculeCenter());
+      if (!this.access.reduceMotion) this.burst.start(this.moleculeCenter());
       this.finishRun();
       console.info(`[Molecule Lab] ${this.level.name} complete!`);
     } else if (!restoring) {
-      this.sfx.snap(this.placedCount / (this.level.slots.length - 1));
+      this.sfx.snap(
+        this.placedCount / (this.level.slots.length - 1),
+        e.getValue(Atom, 'element') as ElementSymbol,
+      );
     }
     if (!restoring) {
       this.persistProgress();
       this.afterPlacement(slot);
     }
-    this.formula.update(this.filled, restoring ? -1 : slot);
+    this.formula.update(this.filled, restoring || this.access.reduceMotion ? -1 : slot);
     this.guide.update(this.filled, this.guideOn);
     this.updatePanel();
   }
@@ -1221,7 +1400,7 @@ export class MoleculeSystem extends createSystem({
     this.flash(e, false);
     this.sfx.error();
     this.idleTime = 0;
-    if (!this.isComplete()) this.mistakes++;
+    if (!this.isComplete() && !this.access.calm) this.mistakes++;
     this.persistProgress();
     this.showHint(hint);
   }
