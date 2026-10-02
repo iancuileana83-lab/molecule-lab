@@ -122,7 +122,8 @@ These apply to every phase. A feature that breaks one of them is not done.
    spot, steady start ring). **Reach assist**: hand-ray distance grab on Quest (gaze
    devices always have it); the level is laid out again through the save. **Table**:
    moves the player rig (-15 / 0 / +10 cm distance, +10 / 0 / -10 cm for Lower / Normal /
-   Higher), so the table, atoms, molecule and panels stay together. **One hand**: every
+   Higher), so the table, atoms, molecule and panels stay together. Near is the default
+   since phase 13 (saved choices are kept). **One hand**: every
    action is a single pinch with either hand (tested with the left hand only).
    **Sound per element**: carbon round and middle, oxygen lower and warm, nitrogen higher
    and bright, on pick-up and on placement. Atom letters were already there (phase 1).
@@ -148,7 +149,7 @@ These apply to every phase. A feature that breaks one of them is not done.
    a restored finished level adds its trophy too). Decorative only, nothing to grab or touch.
    Checked by calculation (243 head positions, 3 table settings, all molecules): 43 cm
    between the cabinet and the nearest atom or guide spot, 0 of 88,695 sight lines to atoms
-   or spots blocked, 25 cm from the info card and 89 cm from the panel in plan view, at
+   or spots blocked, 32 cm from the info card and 96 cm from the panel in plan view (corrected in phase 13), at
    least 4.4 deg sideways gap between the molecule and the cabinet, and all trophy sight
    lines clear of the card and panel (they are about 44 deg to the left at most and 4 deg
    below to 14 deg above eye level, so the player turns the head). Verified in the emulator:
@@ -183,8 +184,8 @@ These apply to every phase. A feature that breaks one of them is not done.
    are 1.3x life size so they read from the seat. Checked by calculation (243 head
    positions): the scene occupies x +-0.16, z -0.52..-0.32, and its top stays at or below
    0.92 m while the molecule's lowest edge is 0.933 m, so 0 of 46,170 sight lines to the
-   molecule or guide spots are blocked; it is 2 cm clear of the panel and 6 cm of the info
-   card in plan view (their nearest corners are higher up). Verified in the emulator by
+   molecule or guide spots are blocked; it is 10 cm clear of the panel and 13 cm of the info
+   card in plan view (corrected in phase 13; the first figures used a wrong rotation order). Verified in the emulator by
    stepping the paused ECS: all three scenes show correctly, no console errors.
 12. **More molecules (optional)** — ibuprofen, vitamin C, vanillin, with a selection menu.
    Built: `src/levels/ibuprofen.ts`, `vitamin-c.ts`, `vanillin.ts`, appended to the level order
@@ -203,9 +204,9 @@ These apply to every phase. A feature that breaks one of them is not done.
    abandoned when another is chosen. The cabinet has two shelves of three (case now to 1.80 m;
    upper trophies up to 23 deg above the eye in the worst head position, inside the glasses'
    25 deg). Calculation (243 head positions): the panel hides no atom or guide spot of any
-   molecule; the info card partly hides one ibuprofen end methyl (389 of 18,225 sight lines,
-   heads about 20 cm or more left of centre, only once the molecule is finished); the cabinet
-   blocks 0 of 177,390 sight lines and keeps at least 3.4 deg sideways from the molecule.
+   molecule; the info card hides none (an earlier version of this note reported a partly hidden
+   ibuprofen methyl; that came from a wrong rotation order in the check and was corrected in
+   phase 13); the cabinet blocks 0 of 177,390 sight lines and keeps at least 3.4 deg sideways from the molecule.
    Story moments for the new molecules are deliberately left for later (no scene plays, no
    error). Verified in the emulator: menu opened and Vanillin chosen with a ray click, vanillin
    finished with a hand pinch, trophy on the upper shelf, ibuprofen and vitamin C layouts and
