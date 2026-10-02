@@ -28,7 +28,7 @@ building with bare hands.
 
 | Time | Shot | Caption |
 |---|---|---|
-| 0:00-0:06 | Cold open: the last caffeine atom snaps in, golden sparks, the molecule glows. | Build the molecules of medicines. |
+| 0:00-0:06 | Cold open: the last caffeine atom snaps in, golden sparks, the molecule glows. | Build real molecules. |
 | 0:06-0:12 | Story scene: a small copy floats above a coffee cup and is taken in, steam rises. | With your bare hands. |
 | 0:12-0:17 | Title screen: Molecule Lab, the description and the Enter VR button; click it. | Molecule Lab, a hands-only VR puzzle |
 | 0:17-0:30 | Enter VR: chime, lanterns brighten, the guide sketch draws itself; one atom starts to glow and a bead of light travels to its spot. | The game shows you what to do. |
@@ -37,7 +37,7 @@ building with bare hands.
 | 1:05-1:15 | Molecule finished: arpeggio, sparks, a tablet scene, the info card with the fact and three stars. | Every molecule ends with a fact. |
 | 1:15-1:35 | Inspect: grab the molecule with one hand and turn it; two hands resize it; spread the hands wide, the atoms glow amber, it comes apart. | Turn it. Resize it. Pull it apart. |
 | 1:35-1:50 | The trophy cabinet on the left: look over, a new trophy pops onto the shelf; pan across the trophies. | Finished molecules become trophies. |
-| 1:50-2:05 | Press Molecules; the menu shows six molecules, three green. Pick Ibuprofen; its larger structure and the formula appear. | Six medicines to build. |
+| 1:50-2:05 | Press Molecules; the menu shows six molecules, three green. Pick Ibuprofen; its larger structure and the formula appear. | Six molecules to build. |
 | 2:05-2:30 | Settings: toggle Calm mode and Reduce motion, switch Reach assist on and move an atom from a distance, move Table to Near. | Made to be accessible. |
 | 2:30-2:45 | Wide shot of the apothecary and the finished molecule. End card on a plain background. | Molecule Lab. Made by Ileana Mazilu, a pharmacy professional with 20 years in community pharmacy. |
 
