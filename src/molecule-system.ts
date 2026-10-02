@@ -278,6 +278,7 @@ export class MoleculeSystem extends createSystem({
   private levelReady = false;
   private access: AccessSettings = { ...DEFAULT_ACCESS };
   private settingsOpen = false;
+  private menuOpen = false;
   /** True when the finished molecule was built in calm mode (no score shown). */
   private completedCalm = false;
   private card?: Object3D;
@@ -292,6 +293,8 @@ export class MoleculeSystem extends createSystem({
   private settingsUi?: {
     playPage: UIElement | null;
     settingsPage: UIElement | null;
+    menuPage: UIElement | null;
+    molButtons: Array<{ button: UIElement | null; label: UIKit.Text | null }>;
     toggles: Record<string, { button: UIElement | null; label: UIKit.Text | null }>;
   };
   private sfx = new SoundFx();
@@ -1036,6 +1039,7 @@ export class MoleculeSystem extends createSystem({
       state === VisibilityState.VisibleBlurred ||
       state === VisibilityState.Hidden;
     this.settingsOpen = false;
+    this.menuOpen = false;
     this.applyTable();
     if (this.levelReady) this.updatePanel();
     // Hands vanish and reappear around a pause; never judge those releases.
@@ -1143,6 +1147,11 @@ export class MoleculeSystem extends createSystem({
     this.settingsUi = {
       playPage: panel.getElementById('play-page'),
       settingsPage: panel.getElementById('settings-page'),
+      menuPage: panel.getElementById('molecules-page'),
+      molButtons: LEVELS.map((_, i) => ({
+        button: panel.getElementById(`mol-${i}`),
+        label: panel.getElementById<UIKit.Text>(`mol-${i}-label`),
+      })),
       toggles,
     };
 
@@ -1151,6 +1160,9 @@ export class MoleculeSystem extends createSystem({
     bind('restart-button', () => this.startLevel(this.levelIndex));
     bind('settings-button', () => this.setSettingsOpen(true));
     bind('back-button', () => this.setSettingsOpen(false));
+    bind('molecules-button', () => this.setMenuOpen(true));
+    bind('mol-back-button', () => this.setMenuOpen(false));
+    LEVELS.forEach((_, i) => bind(`mol-${i}`, () => this.chooseLevel(i)));
     bind('guide-button', () => this.setGuide(!this.guideOn));
     bind('sound-button', () => this.setSound(this.sfx.muted));
     bind('calm-button', () => this.setAccess({ calm: !this.access.calm }));
@@ -1235,6 +1247,45 @@ export class MoleculeSystem extends createSystem({
   private setSettingsOpen(open: boolean): void {
     this.settingsOpen = open;
     this.updatePanel();
+  }
+
+  private setMenuOpen(open: boolean): void {
+    this.menuOpen = open;
+    this.updatePanel();
+  }
+
+  /** Picks a molecule from the menu; a different one starts from its saved progress, if any. */
+  private chooseLevel(index: number): void {
+    this.menuOpen = false;
+    if (index !== this.levelIndex) {
+      this.startLevel(index, this.savedFor(LEVELS[index].id));
+      this.persistProgress();
+    }
+    this.updatePanel();
+  }
+
+  /** Saved progress for a level, if the single progress save belongs to it. */
+  private savedFor(levelId: string): MoleculeSave | undefined {
+    const save = loadProgress();
+    return save && save.levelId === levelId ? save : undefined;
+  }
+
+  /** Gold = the molecule on the bench, green = built before (trophy in the cabinet). */
+  private refreshMenu(): void {
+    this.settingsUi?.molButtons.forEach((m, i) => {
+      const level = LEVELS[i];
+      const current = i === this.levelIndex;
+      const built = this.cabinet.has(level.id);
+      m.label?.setProperties({
+        text: level.name,
+        fontSize: 17,
+        fontWeight: current || built ? 700 : 400,
+        color: current || built ? '#102a1c' : '#ffffff',
+      });
+      m.button?.setProperties({
+        backgroundColor: current ? '#f2d98a' : built ? '#bfe3cd' : '#2b3036',
+      });
+    });
   }
 
   /**
@@ -1327,11 +1378,18 @@ export class MoleculeSystem extends createSystem({
     const hasNext = this.levelIndex < LEVELS.length - 1;
     const atomsToPlace = this.level.slots.length - 1; // the seed is given
     this.ui.levelName.setProperties({
-      text: this.settingsOpen ? 'Settings' : `Level ${this.levelIndex + 1}: ${this.level.name}`,
+      text: this.settingsOpen
+        ? 'Settings'
+        : this.menuOpen
+          ? 'Choose a molecule'
+          : `Level ${this.levelIndex + 1}: ${this.level.name}`,
     });
-    this.settingsUi?.playPage?.setProperties({ display: this.settingsOpen ? 'none' : 'flex' });
+    const playing = !this.settingsOpen && !this.menuOpen;
+    this.settingsUi?.playPage?.setProperties({ display: playing ? 'flex' : 'none' });
     this.settingsUi?.settingsPage?.setProperties({ display: this.settingsOpen ? 'flex' : 'none' });
+    this.settingsUi?.menuPage?.setProperties({ display: this.menuOpen ? 'flex' : 'none' });
     this.refreshSettings();
+    this.refreshMenu();
     this.ui.progress.setProperties({
       text: done
         ? `${this.level.name} complete!`

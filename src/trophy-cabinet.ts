@@ -28,7 +28,9 @@ const FRONT_Z = -0.8;
 const DEPTH = 0.18;
 const WIDTH = 0.58;
 const CHEST_TOP = 1.31;
-const CASE_TOP = 1.65;
+const SHELF2 = 1.56;
+const CASE_TOP = 1.8;
+const PER_ROW = 3;
 const SLOT_DX = 0.19;
 /**
  * Metres per angstrom for a trophy (the build plane uses 0.068). With 0.023 the
@@ -53,16 +55,17 @@ export class TrophyCabinet {
     this.root.name = 'TrophyCabinet';
     this.buildFurniture();
     LEVELS.forEach((level, i) => {
-      const x = CABINET_X + (i - (LEVELS.length - 1) / 2) * SLOT_DX;
+      const x = CABINET_X + ((i % PER_ROW) - (PER_ROW - 1) / 2) * SLOT_DX;
+      const shelf = i < PER_ROW ? CHEST_TOP : SHELF2;
       const ghost = new Mesh(this.ghostGeo, this.ghostMat);
       ghost.name = `TrophyGhost${i}`;
       ghost.rotation.x = -Math.PI / 2;
-      ghost.position.set(x, CHEST_TOP + 0.014, FRONT_Z - DEPTH / 2);
+      ghost.position.set(x, shelf + 0.014, FRONT_Z - DEPTH / 2);
       this.root.add(ghost);
       this.ghosts.push(ghost);
       const trophy = buildMiniMolecule(level, TROPHY_SCALE, ATOM_K, BOND_RADIUS, this.bonds, 0.012);
       trophy.name = `Trophy-${level.id}`;
-      trophy.position.set(x, CHEST_TOP + 0.03, FRONT_Z - DEPTH / 2);
+      trophy.position.set(x, shelf + 0.03, FRONT_Z - DEPTH / 2);
       trophy.visible = false;
       this.root.add(trophy);
       this.trophies.push(trophy);
@@ -175,6 +178,7 @@ export class TrophyCabinet {
     // Top board and display case.
     b.add('oak', box(WIDTH + 0.04, 0.03, DEPTH + 0.04), [CABINET_X, CHEST_TOP - 0.015, zc]);
     b.add('oak', box(WIDTH + 0.04, 0.03, DEPTH + 0.04), [CABINET_X, CASE_TOP + 0.015, zc]);
+    b.add('oak', box(WIDTH - 0.02, 0.02, DEPTH - 0.02), [CABINET_X, SHELF2 - 0.01, zc]);
     for (const dx of [-1, 1]) {
       for (const dz of [-1, 1]) {
         b.add('walnut', box(0.02, CASE_TOP - CHEST_TOP, 0.02), [CABINET_X + dx * (WIDTH / 2 - 0.01), (CHEST_TOP + CASE_TOP) / 2, zc + dz * (DEPTH / 2 - 0.01)]);
@@ -183,6 +187,7 @@ export class TrophyCabinet {
     b.add('linen', box(WIDTH - 0.04, CASE_TOP - CHEST_TOP, 0.008), [CABINET_X, (CHEST_TOP + CASE_TOP) / 2, FRONT_Z - DEPTH + 0.014]);
     // Thin brass rail along the front of the shelf, plus a small knob on top.
     b.add('brass', box(WIDTH, 0.008, 0.008), [CABINET_X, CHEST_TOP + 0.004, FRONT_Z + 0.02]);
+    b.add('brass', box(WIDTH - 0.02, 0.008, 0.008), [CABINET_X, SHELF2 + 0.004, FRONT_Z - 0.01]);
     b.add('brass', new CylinderGeometry(0.012, 0.016, 0.03, 8), [CABINET_X, CASE_TOP + 0.045, zc]);
     // Glass: front and both sides.
     b.add('glass', box(WIDTH - 0.02, CASE_TOP - CHEST_TOP, 0.004), [CABINET_X, (CHEST_TOP + CASE_TOP) / 2, FRONT_Z - 0.004]);

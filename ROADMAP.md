@@ -42,8 +42,8 @@ These apply to every phase. A feature that breaks one of them is not done.
 | 9 | Medicine cabinet with miniature trophies of completed molecules | done |
 | 10 | Inspect the finished molecule with one or two hands; pull it apart with two hands to rebuild | done |
 | 11 | Story moments: caffeine into a coffee cup, aspirin on a willow leaf, paracetamol into a tablet | done |
-| 12 | Optional: more molecules (ibuprofen, vitamin C, vanillin) with a selection menu | next |
-| 13 | Real Quest test, demo video under 3 minutes, Devpost submission form | planned |
+| 12 | Optional: more molecules (ibuprofen, vitamin C, vanillin) with a selection menu | done |
+| 13 | Real Quest test, demo video under 3 minutes, Devpost submission form | next |
 
 ### Phase details
 
@@ -187,6 +187,29 @@ These apply to every phase. A feature that breaks one of them is not done.
    card in plan view (their nearest corners are higher up). Verified in the emulator by
    stepping the paused ECS: all three scenes show correctly, no console errors.
 12. **More molecules (optional)** — ibuprofen, vitamin C, vanillin, with a selection menu.
+   Built: `src/levels/ibuprofen.ts`, `vitamin-c.ts`, `vanillin.ts`, appended to the level order
+   (levels 4-6). The fact texts were approved verbatim by the user; star time limits
+   ibuprofen 3:00, vitamin C 2:15, vanillin 2:00. Structures checked from the level data
+   (hydrogens counted from valence): ibuprofen C13H18O2 (benzene ring with the isobutyl group
+   and the CH(CH3)COOH carboxylic acid para to each other; the two side chains are folded so
+   the drawing is 0.55 m wide, like paracetamol); vitamin C C6H8O6 (five-membered lactone ring
+   O-C(=O)-C(OH)=C(OH)-CH, with a CH(OH)CH2OH side chain on the ring carbon next to the ring
+   oxygen); vanillin C8H8O3 (benzene ring with the CHO aldehyde, the OH para to it and the
+   OCH3 methoxy on the carbon next to the OH). No valence errors; atoms are at least 1.2
+   angstrom apart. A **Molecules** button (with Settings and Build again, now a row of three)
+   opens a menu page with the six molecules: gold = on the bench, green = built before
+   (trophy in the cabinet). Choosing another molecule starts it from its saved progress if
+   the single progress save belongs to it, otherwise fresh, so a half-built molecule is
+   abandoned when another is chosen. The cabinet has two shelves of three (case now to 1.80 m;
+   upper trophies up to 23 deg above the eye in the worst head position, inside the glasses'
+   25 deg). Calculation (243 head positions): the panel hides no atom or guide spot of any
+   molecule; the info card partly hides one ibuprofen end methyl (389 of 18,225 sight lines,
+   heads about 20 cm or more left of centre, only once the molecule is finished); the cabinet
+   blocks 0 of 177,390 sight lines and keeps at least 3.4 deg sideways from the molecule.
+   Story moments for the new molecules are deliberately left for later (no scene plays, no
+   error). Verified in the emulator: menu opened and Vanillin chosen with a ray click, vanillin
+   finished with a hand pinch, trophy on the upper shelf, ibuprofen and vitamin C layouts and
+   formulas shown correctly.
 13. **Submission** — real Quest test, demo video under 3 minutes, Devpost form.
 
 ## Already built (before the numbered phases)
