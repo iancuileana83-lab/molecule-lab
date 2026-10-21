@@ -8,7 +8,8 @@
   settings-page, guide-button, guide-label, sound-button, sound-label,
   calm-button, calm-label, motion-button, motion-label, reach-button,
   reach-label, dist-near/normal/far, height-low/normal/high (+ "-label"),
-  back-button, xr-button, molecules-button, molecules-page, mol-0 .. mol-5 (+ "-label"),
+  back-button, xr-button, molecules-button, molecules-page, ch-0 .. ch-2 (chapter tabs), mol-0 .. mol-2 (the
+  chosen chapter's molecules) (+ "-label"),
   mol-back-button.
 -->
 <style>
@@ -257,30 +258,26 @@
       </div>
     </div>
     <div id="molecules-page" class="page" style="display: none">
-      <div id="row-mol-a" class="button-row">
-        <Button id="mol-0" class="row-button">
-          <ButtonLabel id="mol-0-label" class="button-label">Molecule</ButtonLabel>
+      <div id="row-chapters" class="button-row">
+        <Button id="ch-0" class="tri-button">
+          <ButtonLabel id="ch-0-label" class="button-label">Chapter</ButtonLabel>
         </Button>
-        <Button id="mol-1" class="row-button">
-          <ButtonLabel id="mol-1-label" class="button-label">Molecule</ButtonLabel>
+        <Button id="ch-1" class="tri-button">
+          <ButtonLabel id="ch-1-label" class="button-label">Chapter</ButtonLabel>
         </Button>
-      </div>
-      <div id="row-mol-b" class="button-row">
-        <Button id="mol-2" class="row-button">
-          <ButtonLabel id="mol-2-label" class="button-label">Molecule</ButtonLabel>
-        </Button>
-        <Button id="mol-3" class="row-button">
-          <ButtonLabel id="mol-3-label" class="button-label">Molecule</ButtonLabel>
+        <Button id="ch-2" class="tri-button">
+          <ButtonLabel id="ch-2-label" class="button-label">Chapter</ButtonLabel>
         </Button>
       </div>
-      <div id="row-mol-c" class="button-row">
-        <Button id="mol-4" class="row-button">
-          <ButtonLabel id="mol-4-label" class="button-label">Molecule</ButtonLabel>
-        </Button>
-        <Button id="mol-5" class="row-button">
-          <ButtonLabel id="mol-5-label" class="button-label">Molecule</ButtonLabel>
-        </Button>
-      </div>
+      <Button id="mol-0" class="wide-button">
+        <ButtonLabel id="mol-0-label" class="button-label">Molecule</ButtonLabel>
+      </Button>
+      <Button id="mol-1" class="wide-button">
+        <ButtonLabel id="mol-1-label" class="button-label">Molecule</ButtonLabel>
+      </Button>
+      <Button id="mol-2" class="wide-button">
+        <ButtonLabel id="mol-2-label" class="button-label">Molecule</ButtonLabel>
+      </Button>
       <div class="legend">Green: built. Gold: building now.</div>
       <Button id="mol-back-button" class="button last-button">
         <ButtonIcon>

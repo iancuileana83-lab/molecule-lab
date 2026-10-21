@@ -9,6 +9,7 @@ import {
   TorusGeometry,
 } from '@iwsdk/core';
 import { LEVELS } from './levels/all-levels.js';
+import type { MoleculeLevel } from './levels/types.js';
 import { buildMiniMolecule, createBondParts } from './mini-molecule.js';
 import { GeoBatch } from './scene-assets/lib/geo-batch.js';
 import { makeWoodTexture } from './scene-assets/lib/proc-textures.js';
@@ -21,23 +22,38 @@ import { makeWoodTexture } from './scene-assets/lib/proc-textures.js';
  *
  * Placement (checked by calculation so it never hides the guide spots, the
  * molecule, the tray, the panel or the info card): x -1.24 .. -0.66, z -0.98 ..
- * -0.80, floor to 1.66 m. Everything the player works with is at z >= -0.57.
+ * -0.80, floor to 1.82 m. Everything the player works with is at z >= -0.57.
+ * Three shelves of three, one shelf per chapter of the Molecules menu.
  */
 const CABINET_X = -0.95;
 const FRONT_Z = -0.8;
 const DEPTH = 0.18;
 const WIDTH = 0.58;
 const CHEST_TOP = 1.31;
-const SHELF2 = 1.56;
-const CASE_TOP = 1.8;
+/** Vertical distance between shelves; the lowest shelf is the chest top. */
+const SHELF_STEP = 0.165;
+const SHELF2 = CHEST_TOP + SHELF_STEP;
+const SHELF3 = CHEST_TOP + 2 * SHELF_STEP;
+const CASE_TOP = 1.82;
 const PER_ROW = 3;
 const SLOT_DX = 0.19;
 /**
- * Metres per angstrom for a trophy (the build plane uses 0.068). With 0.023 the
- * widest molecule (paracetamol, 7.5 angstrom) is 17 cm, so all three fit side by
- * side in the 54 cm case with the 19 cm slot spacing.
+ * Largest metres per angstrom for a trophy (the build plane uses 0.068). With
+ * 0.023 the widest molecule (paracetamol, 7.5 angstrom) is 17 cm, so three fit
+ * side by side in the 54 cm case with the 19 cm slot spacing. Taller molecules
+ * are drawn smaller so every trophy fits between its shelf and the next.
  */
 const TROPHY_SCALE = 0.023;
+const TROPHY_MAX_WIDTH = 0.17;
+const TROPHY_MAX_HEIGHT = 0.088;
+
+function trophyScale(level: MoleculeLevel): number {
+  const xs = level.slots.map((s) => s.x);
+  const ys = level.slots.map((s) => s.y);
+  const width = Math.max(...xs) - Math.min(...xs);
+  const height = Math.max(...ys) - Math.min(...ys);
+  return Math.min(TROPHY_SCALE, TROPHY_MAX_WIDTH / width, TROPHY_MAX_HEIGHT / height);
+}
 const ATOM_K = 0.35;
 const BOND_RADIUS = 0.0022;
 const POP_TIME = 0.6;
@@ -56,14 +72,14 @@ export class TrophyCabinet {
     this.buildFurniture();
     LEVELS.forEach((level, i) => {
       const x = CABINET_X + ((i % PER_ROW) - (PER_ROW - 1) / 2) * SLOT_DX;
-      const shelf = i < PER_ROW ? CHEST_TOP : SHELF2;
+      const shelf = CHEST_TOP + Math.floor(i / PER_ROW) * SHELF_STEP;
       const ghost = new Mesh(this.ghostGeo, this.ghostMat);
       ghost.name = `TrophyGhost${i}`;
       ghost.rotation.x = -Math.PI / 2;
       ghost.position.set(x, shelf + 0.014, FRONT_Z - DEPTH / 2);
       this.root.add(ghost);
       this.ghosts.push(ghost);
-      const trophy = buildMiniMolecule(level, TROPHY_SCALE, ATOM_K, BOND_RADIUS, this.bonds, 0.012);
+      const trophy = buildMiniMolecule(level, trophyScale(level), ATOM_K, BOND_RADIUS, this.bonds, 0.012);
       trophy.name = `Trophy-${level.id}`;
       trophy.position.set(x, shelf + 0.03, FRONT_Z - DEPTH / 2);
       trophy.visible = false;
@@ -179,6 +195,7 @@ export class TrophyCabinet {
     b.add('oak', box(WIDTH + 0.04, 0.03, DEPTH + 0.04), [CABINET_X, CHEST_TOP - 0.015, zc]);
     b.add('oak', box(WIDTH + 0.04, 0.03, DEPTH + 0.04), [CABINET_X, CASE_TOP + 0.015, zc]);
     b.add('oak', box(WIDTH - 0.02, 0.02, DEPTH - 0.02), [CABINET_X, SHELF2 - 0.01, zc]);
+    b.add('oak', box(WIDTH - 0.02, 0.02, DEPTH - 0.02), [CABINET_X, SHELF3 - 0.01, zc]);
     for (const dx of [-1, 1]) {
       for (const dz of [-1, 1]) {
         b.add('walnut', box(0.02, CASE_TOP - CHEST_TOP, 0.02), [CABINET_X + dx * (WIDTH / 2 - 0.01), (CHEST_TOP + CASE_TOP) / 2, zc + dz * (DEPTH / 2 - 0.01)]);
@@ -188,6 +205,7 @@ export class TrophyCabinet {
     // Thin brass rail along the front of the shelf, plus a small knob on top.
     b.add('brass', box(WIDTH, 0.008, 0.008), [CABINET_X, CHEST_TOP + 0.004, FRONT_Z + 0.02]);
     b.add('brass', box(WIDTH - 0.02, 0.008, 0.008), [CABINET_X, SHELF2 + 0.004, FRONT_Z - 0.01]);
+    b.add('brass', box(WIDTH - 0.02, 0.008, 0.008), [CABINET_X, SHELF3 + 0.004, FRONT_Z - 0.01]);
     b.add('brass', new CylinderGeometry(0.012, 0.016, 0.03, 8), [CABINET_X, CASE_TOP + 0.045, zc]);
     // Glass: front and both sides.
     b.add('glass', box(WIDTH - 0.02, CASE_TOP - CHEST_TOP, 0.004), [CABINET_X, (CHEST_TOP + CASE_TOP) / 2, FRONT_Z - 0.004]);

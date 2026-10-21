@@ -29,7 +29,7 @@ import { LanternGlow } from './decor-anim.js';
 import { FormulaCard } from './formula-card.js';
 import { paintDecor } from './decor-paint.js';
 import { GuideBead } from './guide-bead.js';
-import { LEVELS } from './levels/all-levels.js';
+import { CHAPTERS, LEVELS, chapterOf, chapterStart } from './levels/all-levels.js';
 import type { ElementSymbol, MoleculeLevel } from './levels/types.js';
 import { MoleculeGuide } from './molecule-guide.js';
 import {
@@ -285,6 +285,8 @@ export class MoleculeSystem extends createSystem({
   private access: AccessSettings = { ...DEFAULT_ACCESS };
   private settingsOpen = false;
   private menuOpen = false;
+  /** Chapter shown on the Molecules menu. */
+  private menuChapter = 0;
   /** True when the finished molecule was built in calm mode (no score shown). */
   private completedCalm = false;
   private card?: Object3D;
@@ -300,6 +302,7 @@ export class MoleculeSystem extends createSystem({
     playPage: UIElement | null;
     settingsPage: UIElement | null;
     menuPage: UIElement | null;
+    chButtons: Array<{ button: UIElement | null; label: UIKit.Text | null }>;
     molButtons: Array<{ button: UIElement | null; label: UIKit.Text | null }>;
     toggles: Record<string, { button: UIElement | null; label: UIKit.Text | null }>;
   };
@@ -1156,7 +1159,11 @@ export class MoleculeSystem extends createSystem({
       playPage: panel.getElementById('play-page'),
       settingsPage: panel.getElementById('settings-page'),
       menuPage: panel.getElementById('molecules-page'),
-      molButtons: LEVELS.map((_, i) => ({
+      chButtons: CHAPTERS.map((_, i) => ({
+        button: panel.getElementById(`ch-${i}`),
+        label: panel.getElementById<UIKit.Text>(`ch-${i}-label`),
+      })),
+      molButtons: CHAPTERS[0].levels.map((_, i) => ({
         button: panel.getElementById(`mol-${i}`),
         label: panel.getElementById<UIKit.Text>(`mol-${i}-label`),
       })),
@@ -1170,7 +1177,10 @@ export class MoleculeSystem extends createSystem({
     bind('back-button', () => this.setSettingsOpen(false));
     bind('molecules-button', () => this.setMenuOpen(true));
     bind('mol-back-button', () => this.setMenuOpen(false));
-    LEVELS.forEach((_, i) => bind(`mol-${i}`, () => this.chooseLevel(i)));
+    CHAPTERS.forEach((_, i) => bind(`ch-${i}`, () => this.setMenuChapter(i)));
+    CHAPTERS[0].levels.forEach((_, j) =>
+      bind(`mol-${j}`, () => this.chooseLevel(chapterStart(this.menuChapter) + j)),
+    );
     bind('guide-button', () => this.setGuide(!this.guideOn));
     bind('sound-button', () => this.setSound(this.sfx.muted));
     bind('calm-button', () => this.setAccess({ calm: !this.access.calm }));
@@ -1259,6 +1269,7 @@ export class MoleculeSystem extends createSystem({
 
   private setMenuOpen(open: boolean): void {
     this.menuOpen = open;
+    if (open) this.menuChapter = chapterOf(this.levelIndex);
     this.updatePanel();
   }
 
@@ -1278,15 +1289,36 @@ export class MoleculeSystem extends createSystem({
     return save && save.levelId === levelId ? save : undefined;
   }
 
-  /** Gold = the molecule on the bench, green = built before (trophy in the cabinet). */
+  private setMenuChapter(index: number): void {
+    this.menuChapter = index;
+    this.refreshMenu();
+  }
+
+  /**
+   * Chapter tabs on top (the open one is gold), then the chapter's molecules:
+   * gold = the molecule on the bench, green = built before (trophy in the cabinet).
+   */
   private refreshMenu(): void {
-    this.settingsUi?.molButtons.forEach((m, i) => {
-      const level = LEVELS[i];
-      const current = i === this.levelIndex;
+    const ui = this.settingsUi;
+    if (!ui) return;
+    ui.chButtons.forEach((c, i) => {
+      const open = i === this.menuChapter;
+      c.label?.setProperties({
+        text: CHAPTERS[i].name,
+        fontSize: 16,
+        fontWeight: open ? 700 : 400,
+        color: open ? '#102a1c' : '#ffffff',
+      });
+      c.button?.setProperties({ backgroundColor: open ? '#f2d98a' : '#2b3036' });
+    });
+    const start = chapterStart(this.menuChapter);
+    ui.molButtons.forEach((m, j) => {
+      const level = LEVELS[start + j];
+      const current = start + j === this.levelIndex;
       const built = this.cabinet.has(level.id);
       m.label?.setProperties({
         text: level.name,
-        fontSize: 17,
+        fontSize: 19,
         fontWeight: current || built ? 700 : 400,
         color: current || built ? '#102a1c' : '#ffffff',
       });

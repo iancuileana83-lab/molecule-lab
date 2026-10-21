@@ -37,7 +37,7 @@ building with bare hands.
 | 1:05-1:15 | Molecule finished: arpeggio, sparks, a tablet scene, the info card with the fact and three stars. | Every molecule ends with a fact. |
 | 1:15-1:35 | Inspect: grab the molecule with one hand and turn it; two hands resize it; spread the hands wide, the atoms glow amber, it comes apart. | Turn it. Resize it. Pull it apart. |
 | 1:35-1:50 | The trophy cabinet on the left: look over, a new trophy pops onto the shelf; pan across the trophies. | Finished molecules become trophies. |
-| 1:50-2:05 | Press Molecules; the menu shows six molecules, three green. Pick Ibuprofen; its larger structure and the formula appear. | Six molecules to build. |
+| 1:50-2:05 | Press Molecules; three chapter tabs (Pain relievers, Vitamins and energy, Kitchen flavours), each with three molecules. Open Pain relievers and pick Ibuprofen; its larger structure and the formula appear. | Nine molecules in three chapters. |
 | 2:05-2:30 | Settings: toggle Calm mode and Reduce motion, switch Reach assist on and move an atom from a distance, move Table to Near. | Made to be accessible. |
 | 2:30-2:45 | Wide shot of the apothecary and the finished molecule. End card on a plain background. | Molecule Lab. Made by Ileana Mazilu, a pharmacy professional with 20 years in community pharmacy. |
 

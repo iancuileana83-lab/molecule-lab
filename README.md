@@ -27,21 +27,26 @@ Made by Ileana Mazilu, a pharmacy professional with 20 years in community pharma
   becomes a **trophy** in the cabinet on your left.
 - You can **turn a finished molecule** in one hand, **resize** it with two hands, or **pull it
   apart** with two hands to build it again.
-- Paracetamol, aspirin and caffeine also get a short decorative scene when finished.
-- The **Molecules** button picks any of the six molecules; progress is saved on the device, so
+- Paracetamol, aspirin, caffeine, ibuprofen, vitamin C and vanillin also get a short decorative
+  scene when finished.
+- The **Molecules** button picks any of the nine molecules, grouped in three chapters (Pain
+  relievers, Vitamins and energy, Kitchen flavours); progress is saved on the device, so
   leaving VR, a pause or a reload never loses your work.
 - On Meta VR Glasses, look at an atom and pinch to pick it up.
 
-## The six molecules
+## The nine molecules
 
-| Molecule | Formula |
-|---|---|
-| Paracetamol | C8H9NO2 |
-| Aspirin | C9H8O4 |
-| Caffeine | C8H10N4O2 |
-| Ibuprofen | C13H18O2 |
-| Vitamin C | C6H8O6 |
-| Vanillin | C8H8O3 |
+| Chapter | Molecule | Formula |
+|---|---|---|
+| Pain relievers | Paracetamol | C8H9NO2 |
+| Pain relievers | Aspirin | C9H8O4 |
+| Pain relievers | Ibuprofen | C13H18O2 |
+| Vitamins and energy | Vitamin C | C6H8O6 |
+| Vitamins and energy | Caffeine | C8H10N4O2 |
+| Vitamins and energy | Glucose | C6H12O6 |
+| Kitchen flavours | Vanillin | C8H8O3 |
+| Kitchen flavours | Menthol | C10H20O |
+| Kitchen flavours | Cinnamaldehyde | C9H8O |
 
 ## Accessibility
 

@@ -42,7 +42,7 @@ The emulator cannot judge this; it matters for the competition's seated rule.
 ## 4. Untested items that need a headset
 
 - [ ] **Finger press (poke) on panel buttons.** Press Settings, Molecules, Build again and
-      the six molecule buttons with an index finger. Does each fire once? Any double presses?
+      the three chapter tabs and the molecule buttons with an index finger. Does each fire once? Any double presses?
       (The emulator's hands have no usable fingertips, so this path could not be tested there.
       The panel is marked as poke-interactable and the buttons listen to the same pointer
       events as for the ray, so it should work.)
@@ -100,8 +100,9 @@ Measured by calculation from the code, with the seated head at the rig origin (h
 1.2 m high, 5 cm behind the origin) and variations of the head position of about 12 cm
 sideways, 10 cm in height and 15 cm in depth. Real seat position and arm length will differ.
 
-- **Reach.** With the original table position (Normal), 50 of 70 tray atoms (all six levels
-  together) and the panel centre were farther than 60 cm from the head (tray up to 70 cm,
+- **Reach.** With the original table position (Normal), 50 of 70 tray atoms (the first six
+  levels together; glucose, menthol and cinnamaldehyde use the same tray rows with at most 11
+  loose atoms but were not part of this measurement, so measure again) and the panel centre were farther than 60 cm from the head (tray up to 70 cm,
   molecule up to 66 cm, panel centre 67 cm). Since the table was moved nearer, **Near is now the
   default**: the tray reaches at most 60 cm (97% of the tray within 60 cm), the molecule at
   most 54 cm and the panel centre is 59 cm away. Measured from the shoulders instead of the
@@ -110,11 +111,11 @@ sideways, 10 cm in height and 15 cm in depth. Real seat position and arm length 
 - With Near, the bottom corner of the panel is about 45 degrees below the straight-ahead
   view (38 degrees with Normal). Meta VR Glasses see about 43 degrees down, so the lowest
   buttons may sit at the very edge of their view; look down slightly to read them.
-- No atom or guide spot of any of the six molecules is hidden by the panel, the info card, the
+- No atom or guide spot of any of the first six molecules is hidden by the panel, the info card, the
   cabinet or the story scene, from any of the tested head positions. A few tray atoms
   (about 1%) are partly behind the panel from extreme head positions.
-- The trophy cabinet is up to about 60 degrees to the side, and its upper shelf up to
-  about 30 degrees above the eye for low head positions (the glasses see 25 degrees up). It is
+- The trophy cabinet is up to about 60 degrees to the side, and its upper shelf (now the third of three shelves) up to
+  about 31 degrees above the eye for low head positions (the glasses see 25 degrees up). It is
   decoration only, but it may be uncomfortable to look at.
 - **Hand ray clicks on panel buttons work in the emulator.** The buttons react to generic pointer
   events (pointer down and up), not to a controller-only event, so a hand-tracked pinch ray

@@ -43,7 +43,9 @@ These apply to every phase. A feature that breaks one of them is not done.
 | 10 | Inspect the finished molecule with one or two hands; pull it apart with two hands to rebuild | done |
 | 11 | Story moments: caffeine into a coffee cup, aspirin on a willow leaf, paracetamol into a tablet | done |
 | 12 | Optional: more molecules (ibuprofen, vitamin C, vanillin) with a selection menu | done |
-| 13 | Real Quest test, demo video under 3 minutes, Devpost submission form | next |
+| 13 | Chapters on the Molecules menu and three new molecules (glucose, menthol, cinnamaldehyde) | done |
+| 14 | Discovery mode: free build, the game recognises what you built and shows a fun fact | next |
+| 15 | Real Quest test, demo video under 3 minutes, Devpost submission form | planned |
 
 ### Phase details
 
@@ -198,7 +200,7 @@ These apply to every phase. A feature that breaks one of them is not done.
    oxygen); vanillin C8H8O3 (benzene ring with the CHO aldehyde, the OH para to it and the
    OCH3 methoxy on the carbon next to the OH). No valence errors; atoms are at least 1.2
    angstrom apart. A **Molecules** button (with Settings and Build again, now a row of three)
-   opens a menu page with the six molecules: gold = on the bench, green = built before
+   opens a menu page with the six molecules (nine and in chapters since phase 13): gold = on the bench, green = built before
    (trophy in the cabinet). Choosing another molecule starts it from its saved progress if
    the single progress save belongs to it, otherwise fresh, so a half-built molecule is
    abandoned when another is chosen. The cabinet has two shelves of three (case now to 1.80 m;
@@ -211,7 +213,40 @@ These apply to every phase. A feature that breaks one of them is not done.
    new molecules" below the phase details). Verified in the emulator: menu opened and Vanillin chosen with a ray click, vanillin
    finished with a hand pinch, trophy on the upper shelf, ibuprofen and vitamin C layouts and
    formulas shown correctly.
-13. **Submission** — real Quest test, demo video under 3 minutes, Devpost form.
+13. **Chapters and three new molecules** — the Molecules menu groups the nine levels into three
+   chapters: Pain relievers (paracetamol, aspirin, ibuprofen), Vitamins and energy (vitamin C,
+   caffeine, glucose) and Kitchen flavours (vanillin, menthol, cinnamaldehyde). Fact texts were
+   approved verbatim by the user (review file, October 2026). Built: `src/levels/glucose.ts`
+   (C6H12O6, 12 atoms, star time 2:15), `menthol.ts` (C10H20O, 11 atoms, 2:00) and
+   `cinnamaldehyde.ts` (C9H8O, 10 atoms, 2:00); formulas and valences checked from the level
+   data (no valence errors, all atoms at least 2.0 angstrom apart unless bonded, widest drawing
+   0.47 m, so the tray and the layout rules are unchanged). `all-levels.ts` now holds the
+   chapters and the play order follows them (saves are keyed by molecule name, so progress,
+   best scores and trophies carry over). The menu page has three chapter tabs (the open one is
+   gold) above that chapter's three molecules (gold = on the bench, green = built); the panel
+   stays 415 units high in the menu, below the 454 of the play page. The cabinet has three
+   shelves of three, one per chapter, spaced 16.5 cm apart (chest top 1.31 m, shelves 1.475
+   and 1.64 m, case top 1.82 m); each trophy is drawn at most 17 cm wide and 8.8 cm tall (plus
+   atoms), so ibuprofen and caffeine are smaller than before. Checked by calculation (45 head
+   positions): the info card and the panel block none of the sight lines to the trophies
+   (0.1% at most), the top trophy row is about 1.2 degrees higher above the eye than before
+   (27.7 instead of 26.5 degrees for heads at 1.2 m or more, 31.6 instead of 30.5 degrees for
+   the lowest heads), and the sideways gap between the molecule and the cabinet is 10.7 degrees.
+   Verified in the emulator: glucose and cinnamaldehyde start with the right formula and tray,
+   glucose, vanillin, menthol and cinnamaldehyde finish (atoms placed through the game's own
+   placement code, not by pinch), the trophies appear on the shelves, and a real controller
+   ray click on the "Vitamins and energy" tab and then on Caffeine loaded Level 5: Caffeine.
+   Not verified: finger poke and hand pinch on the new tabs (same button code as before),
+   a real pinch-through of the three new levels, and the look on a headset. **Capsaicin was
+   dropped** in favour of cinnamaldehyde, the approved fallback: folded as tightly as
+   possible it is 9 by 8.8 angstrom with 22 atoms, which is 0.61 m wide at the normal scale
+   (too wide), and shrunk to fit (0.42 m tall) its atoms nearly touch, its top atoms are
+   about 0.65 m from a seated hand and it needs a third tray row. The three newest levels have
+   no story scene yet.
+14. **Discovery mode** — planned: free build, recognition of 18 molecules (nine small ones and
+   the nine levels), see the review file for the texts. Feature freeze November 4; dropped if
+   not stable by about November 6.
+15. **Submission** — real Quest test, demo video under 3 minutes, Devpost form.
 
 **Story moments for the new molecules** (addendum to phases 11 and 12, approved by the user
 with captions). Same 4.4 s timing and 1.3x object scale as the first three, in

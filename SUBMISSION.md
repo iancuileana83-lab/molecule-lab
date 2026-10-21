@@ -14,8 +14,10 @@ Build real molecules, from paracetamol to vanillin, with your bare hands in a co
 
 **Inspiration.** I have spent 20 years in community pharmacy, and customers often asked me what is actually inside their medicine. I would explain that every tablet holds an active substance, plus excipients that give the final product its shape, size and colour. The active substance is a molecule, but on paper it is only a row of letters and lines. I wanted people to hold one: to pick up the atoms, feel where each one belongs, and see the whole structure appear in front of them. Molecule Lab is a small, calm puzzle for that moment of "so this is what it looks like".
 
-**What you do.** Sitting at an old apothecary's bench, you build the molecules of six everyday
-substances: paracetamol, aspirin, caffeine, ibuprofen, vitamin C and vanillin. You pinch an
+**What you do.** Sitting at an old apothecary's bench, you build the molecules of nine everyday
+substances in three chapters: pain relievers (paracetamol, aspirin, ibuprofen), vitamins and
+energy (vitamin C, caffeine, glucose) and kitchen flavours (vanillin, menthol, cinnamaldehyde).
+You pinch an
 atom, bring it next to the growing molecule, and a correct bond snaps into place with a bell
 note that rises as the molecule grows. A wrong bond bounces back with a soft tone, never a
 punishment. A faint guide shows the target, and a textbook structural formula on the panel lights
