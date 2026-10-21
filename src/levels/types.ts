@@ -12,6 +12,8 @@ export interface MoleculeLevel {
   /** [slotA, slotB, bondOrder] */
   bonds: Array<[number, number, 1 | 2]>;
   fact: string;
+  /** One line shown on the panel while this molecule's story scene plays, if it has one. */
+  storyCaption?: string;
   /** Finishing within this many seconds earns the time star. */
   starTimeSec: number;
 }

@@ -43,4 +43,6 @@ export const VANILLIN: MoleculeLevel = {
   ],
   starTimeSec: 120,
   fact: 'Vanillin is the main flavor molecule of vanilla. It was first isolated from vanilla pods in 1858 by the French chemist Nicolas-Théodore Gobley, and today most of the vanillin used in food is made in factories.',
+  storyCaption:
+    'Vanillin gives vanilla its sweet smell and taste. Natural vanilla comes from the pods of an orchid, and most vanillin used today is made in factories.',
 };

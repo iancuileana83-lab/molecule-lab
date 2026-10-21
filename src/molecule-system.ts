@@ -58,7 +58,7 @@ import {
 } from './scene-assets/atoms.scene-asset.js';
 import { formatTime, isBetter, Score, scoreOf, starBreakdown } from './scoring.js';
 import { SoundFx } from './sound-fx.js';
-import { StoryMoment } from './story-moment.js';
+import { STORY_TOTAL, StoryMoment } from './story-moment.js';
 import { TrophyCabinet } from './trophy-cabinet.js';
 
 /** Metres per angstrom when laying a template out in front of the player. */
@@ -212,6 +212,12 @@ export class MoleculeSystem extends createSystem({
   /** Seconds after a pause/exit/resume during which releases are set aside. */
   private releaseGrace = 0;
   private hintTime = 0;
+  /** Seconds until the story caption appears; 0 when none is waiting. */
+  private captionDelay = 0;
+  /** The hint line currently shows a story caption. */
+  private captionShown = false;
+  /** The inspect hint was held back by the caption and follows it. */
+  private inspectHintPending = false;
   private seed?: Entity;
   private seedRing!: Mesh;
   private seedRingMat!: MeshBasicMaterial;
@@ -408,8 +414,7 @@ export class MoleculeSystem extends createSystem({
     this.bestScores = loadBestScores();
     const save = loadProgress();
     const saved = save ? LEVELS.findIndex((l) => l.id === save.levelId) : -1;
-    this.startLevel(Math.max(saved, 0), saved >= 0 ? (save ?? undefined) : undefined);
-  }
+    this.startLevel(Math.max(saved, 0), saved >= 0 ? (save ?? undefined) : undefined);  }
 
   /** Clears the current molecule and lays out a level's atoms. */
   private startLevel(index: number, save?: MoleculeSave): void {
@@ -425,6 +430,7 @@ export class MoleculeSystem extends createSystem({
     }
     this.teardownInspect();
     this.story.stop();
+    this.captionDelay = 0;
     this.pendingReleases.length = 0;
     this.hideHint();
 
@@ -855,7 +861,8 @@ export class MoleculeSystem extends createSystem({
     this.inspectPivot = pivot;
     this.inspectEntity = entity;
     this.inspectReturn = 1;
-    this.showHint(this.farGrab ? TEXT_INSPECT_FAR : TEXT_INSPECT);
+    if (this.captionShown || this.captionDelay > 0) this.inspectHintPending = true;
+    else this.showHint(this.farGrab ? TEXT_INSPECT_FAR : TEXT_INSPECT);
   }
 
   private updateInspect(delta: number): void {
@@ -1434,10 +1441,21 @@ export class MoleculeSystem extends createSystem({
     if (!this.ui) return;
     this.ui.hint.setProperties({ text, display: 'flex' });
     this.hintTime = HINT_TIME;
+    this.captionShown = false;
+    this.inspectHintPending = false;
+  }
+
+  /** The story caption stays for as long as the scene plays. */
+  private showCaption(text: string): void {
+    this.showHint(text);
+    this.hintTime = STORY_TOTAL;
+    this.captionShown = true;
   }
 
   private hideHint(): void {
     this.hintTime = 0;
+    this.captionShown = false;
+    this.inspectHintPending = false;
     this.ui?.hint.setProperties({ display: 'none' });
   }
 
@@ -1477,9 +1495,21 @@ export class MoleculeSystem extends createSystem({
 
     this.updateSeedCue(delta);
 
+    if (this.captionDelay > 0) {
+      this.captionDelay -= delta;
+      if (this.captionDelay <= 0 && this.level.storyCaption) {
+        const pending = this.inspectHintPending;
+        this.showCaption(this.level.storyCaption);
+        this.inspectHintPending = pending;
+      }
+    }
     if (this.hintTime > 0) {
       this.hintTime -= delta;
-      if (this.hintTime <= 0) this.hideHint();
+      if (this.hintTime <= 0) {
+        const inspectNext = this.inspectHintPending;
+        this.hideHint();
+        if (inspectNext) this.showHint(this.farGrab ? TEXT_INSPECT_FAR : TEXT_INSPECT);
+      }
     }
 
     for (const e of this.queries.atoms.entities) {
@@ -1658,7 +1688,10 @@ export class MoleculeSystem extends createSystem({
       this.finishRun();
       this.addTrophy(true);
       // Decorative story moment; skipped with Reduce motion.
-      if (!this.access.reduceMotion) this.story.play(this.level.id, STORY_DELAY);
+      if (!this.access.reduceMotion) {
+        this.story.play(this.level.id, STORY_DELAY);
+        if (this.level.storyCaption) this.captionDelay = STORY_DELAY;
+      }
       console.info(`[Molecule Lab] ${this.level.name} complete!`);
     } else if (!restoring) {
       this.sfx.snap(

@@ -207,11 +207,27 @@ These apply to every phase. A feature that breaks one of them is not done.
    molecule; the info card hides none (an earlier version of this note reported a partly hidden
    ibuprofen methyl; that came from a wrong rotation order in the check and was corrected in
    phase 13); the cabinet blocks 0 of 177,390 sight lines and keeps at least 3.4 deg sideways from the molecule.
-   Story moments for the new molecules are deliberately left for later (no scene plays, no
-   error). Verified in the emulator: menu opened and Vanillin chosen with a ray click, vanillin
+   Story moments for the new molecules were added afterwards (see "Story moments for the
+   new molecules" below the phase details). Verified in the emulator: menu opened and Vanillin chosen with a ray click, vanillin
    finished with a hand pinch, trophy on the upper shelf, ibuprofen and vitamin C layouts and
    formulas shown correctly.
 13. **Submission** — real Quest test, demo video under 3 minutes, Devpost form.
+
+**Story moments for the new molecules** (addendum to phases 11 and 12, approved by the user
+with captions). Same 4.4 s timing and 1.3x object scale as the first three, in
+`src/story-moment.ts`. Ibuprofen: a glass of water with a ripple ring when the copy is taken
+in. Vitamin C: an upright orange slice that turns once and pulses on landing. Vanillin: a
+cream five-petal vanilla flower whose petals lift and open a little on landing, with a curled
+dark pod beside it. A one-line caption per molecule (`storyCaption` in the level file, texts
+approved verbatim) shows in the panel's hint line while the scene plays (4.4 s); the "move and
+turn the molecule" hint follows it if it was waiting. Reduce motion skips the scene and its
+caption; Calm mode plays them normally. Checked by calculation: every scene object stays
+within x +-0.16 and z +-0.1 of the anchor and below 0.15 m above it, and the hovering copies
+top out at 0.917 m (ibuprofen, the tallest), so the earlier ceiling of 0.92 m and the sight-line
+results still hold. Verified in the emulator by stepping the paused ECS: all three scenes show,
+the longest caption fits the panel (four lines). Not verified end to end: a real completion of
+the three molecules with the caption (the scene and the caption were tested separately), and
+the look from a real headset.
 
 ## Already built (before the numbered phases)
 

@@ -51,4 +51,6 @@ export const IBUPROFEN: MoleculeLevel = {
   ],
   starTimeSec: 180,
   fact: 'Ibuprofen relieves pain, reduces fever and eases inflammation. It was discovered in the 1960s by a research team at the Boots company in the UK, and it is on the WHO List of Essential Medicines.',
+  storyCaption:
+    'Ibuprofen is a medicine for pain, fever and inflammation. Its name is short for its chemical name, isobutylphenylpropionic acid.',
 };

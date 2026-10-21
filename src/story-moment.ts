@@ -21,7 +21,9 @@ import { buildMiniMolecule, createBondParts } from './mini-molecule.js';
  * A short, purely decorative scene played when a molecule is finished: a small
  * copy of the molecule hovers over an everyday object and is "taken in" by it
  * (caffeine into a coffee cup, aspirin onto a willow leaf, paracetamol into a
- * tablet). No text and nothing to touch. It sits on the bench in front of the
+ * tablet, ibuprofen into a glass of water, vitamin C onto an orange slice,
+ * vanillin onto a vanilla flower). No text in the scene itself (a caption for
+ * the newer ones is shown on the panel) and nothing to touch. It sits on the bench in front of the
  * finished molecule, where the atom tray was, and stays below the molecule's
  * lowest atom so it never hides the molecule, the guide spots, the panel or the
  * info card (checked by calculation).
@@ -90,6 +92,9 @@ export class StoryMoment {
       caffeine: () => this.coffeeCup(make, std),
       aspirin: () => this.willowLeaf(make, std),
       paracetamol: () => this.tablet(make, std),
+      ibuprofen: () => this.waterGlass(make, std),
+      'vitamin-c': () => this.orangeSlice(make, std),
+      vanillin: () => this.vanillaFlower(make, std),
     };
     for (const level of LEVELS) {
       const build = objects[level.id];
@@ -259,5 +264,126 @@ export class StoryMoment {
       obj.scale.setScalar(OBJECT_SCALE * (1 + 0.12 * Math.sin(Math.PI * easeOutCubic(k))));
     };
     return { obj, targetY: 0.012 * OBJECT_SCALE, animate };
+  }
+
+  private waterGlass(
+    make: <T extends BufferGeometry>(g: T) => T,
+    std: (p: ConstructorParameters<typeof MeshStandardMaterial>[0]) => MeshStandardMaterial,
+  ) {
+    const glassMat = std({ color: 0xcfe8f0, roughness: 0.1, transparent: true, opacity: 0.4, side: DoubleSide });
+    const waterMat = std({ color: 0x5aaed0, roughness: 0.2, transparent: true, opacity: 0.75 });
+    const obj = new Group();
+    const glass = new Mesh(
+      make(
+        new LatheGeometry(
+          [[0, 0], [0.024, 0], [0.026, 0.003], [0.033, 0.088], [0.034, 0.09]].map(([x, y]) => new Vector2(x, y)),
+          18,
+        ),
+      ),
+      glassMat,
+    );
+    const water = new Mesh(make(new CylinderGeometry(0.029, 0.024, 0.055, 18)), waterMat);
+    water.position.y = 0.0355;
+    obj.add(water, glass);
+    const surfaceY = 0.063;
+
+    const ringMat = new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false });
+    this.disposables.push(ringMat);
+    const ring = new Mesh(make(new TorusGeometry(1, 0.06, 6, 24)), ringMat);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = surfaceY + 0.0015;
+    ring.scale.setScalar(0.001);
+    obj.add(ring);
+    const animate = (t: number) => {
+      // A soft ripple ring spreads when the molecule is taken in.
+      const k = clamp01((t - (T_ABSORB_END - 0.3)) / 0.7);
+      ring.scale.setScalar(Math.max(0.026 * easeOutCubic(k), 0.001));
+      ringMat.opacity = k > 0 && k < 1 ? 0.7 * (1 - k) : 0;
+    };
+    return { obj, targetY: surfaceY * OBJECT_SCALE, animate };
+  }
+
+  private orangeSlice(
+    make: <T extends BufferGeometry>(g: T) => T,
+    std: (p: ConstructorParameters<typeof MeshStandardMaterial>[0]) => MeshStandardMaterial,
+  ) {
+    const peel = std({ color: 0xe8821a, roughness: 0.6 });
+    const flesh = std({ color: 0xf6a53a, roughness: 0.45, side: DoubleSide });
+    const pith = std({ color: 0xfbe3b0, roughness: 0.7 });
+    const radius = 0.05;
+    const obj = new Group();
+    // The slice stands on its edge and faces the player; the copy hovers in front of it.
+    const holder = new Group();
+    holder.position.set(0, radius + 0.002, -0.03);
+    const spinner = new Group();
+    holder.add(spinner);
+    const rim = new Mesh(make(new TorusGeometry(radius, 0.004, 8, 28)), peel);
+    const disc = new Mesh(make(new CylinderGeometry(radius - 0.002, radius - 0.002, 0.006, 28)), flesh);
+    disc.rotation.x = Math.PI / 2;
+    const hub = new Mesh(make(new CylinderGeometry(0.005, 0.005, 0.008, 10)), pith);
+    hub.rotation.x = Math.PI / 2;
+    spinner.add(disc, rim, hub);
+    const wallGeo = make(new BoxGeometry(radius - 0.004, 0.0015, 0.0075));
+    for (let i = 0; i < 8; i++) {
+      const wall = new Mesh(wallGeo, pith);
+      const a = (i / 8) * Math.PI;
+      // Each wall passes through the centre, so eight of them make sixteen spokes.
+      wall.scale.x = 2;
+      wall.rotation.z = a;
+      spinner.add(wall);
+    }
+    obj.add(holder);
+    const animate = (t: number) => {
+      // One slow turn while the copy hovers, a small pulse when it lands.
+      const turn = easeInOut(clamp01((t - T_MOLECULE_FULL) / (T_ABSORB_START - T_MOLECULE_FULL)));
+      spinner.rotation.y = turn * Math.PI * 2;
+      const k = clamp01((t - T_ABSORB_END + 0.3) / 0.5);
+      holder.scale.setScalar(1 + 0.08 * Math.sin(Math.PI * k));
+    };
+    return { obj, targetY: (2 * radius + 0.002) * OBJECT_SCALE, animate };
+  }
+
+  private vanillaFlower(
+    make: <T extends BufferGeometry>(g: T) => T,
+    std: (p: ConstructorParameters<typeof MeshStandardMaterial>[0]) => MeshStandardMaterial,
+  ) {
+    const petalMat = std({ color: 0xf4ecc8, roughness: 0.55, side: DoubleSide });
+    const heart = std({ color: 0xd9c25a, roughness: 0.5 });
+    const podMat = std({ color: 0x3a2314, roughness: 0.5 });
+    const obj = new Group();
+
+    const petalGeo = make(new SphereGeometry(0.026, 10, 8));
+    const pivots: Group[] = [];
+    for (let i = 0; i < 5; i++) {
+      const pivot = new Group();
+      pivot.rotation.y = (i / 5) * Math.PI * 2;
+      const petal = new Mesh(petalGeo, petalMat);
+      petal.position.x = 0.026;
+      petal.scale.set(1, 0.16, 0.55);
+      pivot.add(petal);
+      pivot.position.y = 0.008;
+      obj.add(pivot);
+      pivots.push(pivot);
+    }
+    const core = new Mesh(make(new SphereGeometry(0.009, 10, 8)), heart);
+    core.position.y = 0.011;
+    obj.add(core);
+
+    // A curled pod lying beside the flower.
+    const pod = new Mesh(make(new TorusGeometry(0.028, 0.0045, 6, 24, Math.PI * 1.25)), podMat);
+    pod.rotation.x = -Math.PI / 2;
+    pod.rotation.z = 0.5;
+    pod.position.set(0.088, 0.005, 0.01);
+    obj.add(pod);
+
+    const animate = (t: number) => {
+      // The petals lie almost flat, lift a little while the copy sways, and open
+      // a touch more when it lands.
+      const lift = clamp01((t - T_MOLECULE_IN) / 1.2);
+      const land = clamp01((t - T_ABSORB_END + 0.4) / 0.6);
+      const tilt = 0.12 + 0.18 * easeInOut(lift) + 0.2 * Math.sin(Math.PI * land);
+      for (const p of pivots) p.rotation.z = tilt;
+    };
+    return { obj, targetY: 0.02 * OBJECT_SCALE, animate };
   }
 }

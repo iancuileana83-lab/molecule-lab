@@ -57,4 +57,6 @@ export const VITAMIN_C: MoleculeLevel = {
   ],
   starTimeSec: 135,
   fact: 'Vitamin C, also called ascorbic acid, is a vitamin that humans cannot make, so it comes from food such as citrus fruit, peppers and berries. Albert Szent-Györgyi isolated it in the late 1920s and received the 1937 Nobel Prize partly for this work.',
+  storyCaption:
+    "Vitamin C is found in citrus fruit, peppers and berries. People can't make it, so it has to come from food.",
 };
