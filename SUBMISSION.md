@@ -25,7 +25,10 @@ up atom by atom. A finished molecule shows a short fact, earns up to three stars
 quick, precise) and becomes a small trophy in a glass cabinet. A short decorative scene
 follows for three of them: caffeine meets a coffee cup, aspirin a willow leaf, paracetamol a
 tablet. You can also turn a finished molecule in your hands, resize it with two hands, or pull
-it apart to build it again.
+it apart to build it again. Discovery mode lets you build freely from carbon, nitrogen and
+oxygen atoms: the game names what you made (water, carbon dioxide, the acetic acid of vinegar
+and 15 more), with a fun fact, and answers "Not a known molecule yet, try again" to anything
+else.
 
 **How it was built.** I designed Molecule Lab and built it with an AI coding assistant (Claude Code), checking every molecule structure and fact myself. Molecule Lab is a WebXR experience made with the Immersive Web SDK
 (IWSDK) and Three.js in TypeScript. Nothing is downloaded: the apothecary room, atoms, bonds,

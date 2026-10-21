@@ -8,7 +8,8 @@
   settings-page, guide-button, guide-label, sound-button, sound-label,
   calm-button, calm-label, motion-button, motion-label, reach-button,
   reach-label, dist-near/normal/far, height-low/normal/high (+ "-label"),
-  back-button, xr-button, molecules-button, molecules-page, ch-0 .. ch-2 (chapter tabs), mol-0 .. mol-2 (the
+  back-button, xr-button, molecules-button, molecules-page, discovery-button (+ "-label"), row-discovery, undo-button,
+  bond-button (+ "-label"), restart-label, ch-0 .. ch-2 (chapter tabs), mol-0 .. mol-2 (the
   chosen chapter's molecules) (+ "-label"),
   mol-back-button.
 -->
@@ -245,6 +246,14 @@
         </ButtonIcon>
         <ButtonLabel class="button-label">Play again from level 1</ButtonLabel>
       </Button>
+      <div id="row-discovery" class="button-row" style="display: none">
+        <Button id="undo-button" class="row-button">
+          <ButtonLabel id="undo-label" class="button-label">Undo</ButtonLabel>
+        </Button>
+        <Button id="bond-button" class="row-button">
+          <ButtonLabel id="bond-label" class="button-label">Bond: Single</ButtonLabel>
+        </Button>
+      </div>
       <div id="row-play" class="button-row last-button">
         <Button id="molecules-button" class="tri-button">
           <ButtonLabel class="button-label">Molecules</ButtonLabel>
@@ -253,7 +262,7 @@
           <ButtonLabel class="button-label">Settings</ButtonLabel>
         </Button>
         <Button id="restart-button" class="tri-button">
-          <ButtonLabel class="button-label">Build again</ButtonLabel>
+          <ButtonLabel id="restart-label" class="button-label">Build again</ButtonLabel>
         </Button>
       </div>
     </div>
@@ -277,6 +286,9 @@
       </Button>
       <Button id="mol-2" class="wide-button">
         <ButtonLabel id="mol-2-label" class="button-label">Molecule</ButtonLabel>
+      </Button>
+      <Button id="discovery-button" class="wide-button">
+        <ButtonLabel id="discovery-label" class="button-label">Discovery mode</ButtonLabel>
       </Button>
       <div class="legend">Green: built. Gold: building now.</div>
       <Button id="mol-back-button" class="button last-button">

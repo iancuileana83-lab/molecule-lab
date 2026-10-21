@@ -32,6 +32,11 @@ Made by Ileana Mazilu, a pharmacy professional with 20 years in community pharma
 - The **Molecules** button picks any of the nine molecules, grouped in three chapters (Pain
   relievers, Vitamins and energy, Kitchen flavours); progress is saved on the device, so
   leaving VR, a pause or a reload never loses your work.
+- **Discovery mode** (button on the Molecules menu): build anything you like from carbon,
+  nitrogen and oxygen atoms. The game recognises 18 molecules (water, carbon dioxide,
+  ammonia, methane, the acetic acid of vinegar, and the nine molecules of the levels, among
+  others) and shows a fun fact; anything else gets a friendly "Not a known molecule yet,
+  try again". Bond: Double makes double bonds, Undo and Clear fix mistakes.
 - On Meta VR Glasses, look at an atom and pinch to pick it up.
 
 ## The nine molecules

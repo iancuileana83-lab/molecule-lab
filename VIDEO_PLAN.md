@@ -55,3 +55,6 @@ https://iancuileana83-lab.github.io/molecule-lab/, "Hands only. Seated. Under 10
 - Do not show or claim any medical effect. The facts in the game are general history and
   information; the story scenes are decorative.
 - If the time is over 3:00, drop the Ibuprofen menu shot first, then shorten the accessibility shot.
+- Optional 10-15 second clip (only if there is time): Molecules, Discovery mode, pinch an oxygen
+  into the air ("You found: Water!"), then O, C, O with Bond: Double ("Carbon dioxide"). If
+  the video is long, drop it before anything else.

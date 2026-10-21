@@ -31,6 +31,21 @@ import { paintDecor } from './decor-paint.js';
 import { GuideBead } from './guide-bead.js';
 import { CHAPTERS, LEVELS, chapterOf, chapterStart } from './levels/all-levels.js';
 import type { ElementSymbol, MoleculeLevel } from './levels/types.js';
+import {
+  ATTACH_RANGE,
+  attachPoint,
+  BondOrder,
+  firstPoint,
+  freeValence,
+  Graph,
+  Known,
+  KNOWN_COUNT,
+  loadDiscovery,
+  MAX_ATOMS,
+  recognise,
+  saveDiscovery,
+  VALENCE,
+} from './discovery.js';
 import { MoleculeGuide } from './molecule-guide.js';
 import {
   AccessSettings,
@@ -165,6 +180,31 @@ const TEXT_INTRO_PLACE = 'Now bring it to the glowing spot.';
 const TEXT_INTRO_PLACE_NOGUIDE = 'Now bring it next to the floating carbon.';
 const TEXT_FIRST_BOND = "Nice! That's your first bond.";
 
+/** Discovery mode: three dispensers on the front row of the tray give unlimited atoms. */
+const DISC_DISPENSERS: Array<{ el: ElementSymbol; x: number }> = [
+  { el: 'C', x: -0.14 },
+  { el: 'N', x: 0 },
+  { el: 'O', x: 0.14 },
+];
+const DISC_TRAY_Y = 0.8;
+const DISC_TRAY_Z = -0.38;
+/** Seconds of stillness after the last change before the game names the molecule. */
+const DISC_EVAL_DELAY = 1.2;
+/** A refused atom stays a moment (red) before it goes. */
+const DISC_REFUSE_TIME = 0.35;
+const TEXT_DISC_EMPTY = 'Pinch an atom from the tray and place it in the air in front of you.';
+const TEXT_DISC_EMPTY_GAZE =
+  'Look at an atom in the tray and pinch, then place it in the air in front of you.';
+const TEXT_DISC_EMPTY_REACH =
+  'Point at an atom in the tray and pinch, then place it in the air in front of you.';
+const TEXT_DISC_BUILD =
+  'Bring more atoms next to your atoms. The game names what you build.';
+const TEXT_DISC_BUILD_GAZE =
+  'Look at an atom, pinch, and bring it next to your atoms. The game names what you build.';
+const TEXT_DISC_BUILD_REACH =
+  'Point at an atom, pinch, and bring it next to your atoms. The game names what you build.';
+const TEXT_DISC_UNKNOWN = 'Not a known molecule yet, try again';
+
 const ELEMENT_LABEL: Record<ElementSymbol, string> = {
   C: 'carbon (grey)',
   N: 'nitrogen (blue)',
@@ -287,6 +327,28 @@ export class MoleculeSystem extends createSystem({
   private menuOpen = false;
   /** Chapter shown on the Molecules menu. */
   private menuChapter = 0;
+  /** Levels, or the free-build Discovery mode. */
+  private mode: 'levels' | 'discovery' = 'levels';
+  private discNodes: Array<{ entity: Entity; el: ElementSymbol; pos: Vector3 }> = [];
+  private discBonds: Array<[number, number, BondOrder]> = [];
+  /** Bond sticks of each node's bond to the node it was attached to. */
+  private discSticks: Entity[][] = [];
+  private discDiscards: Array<{ e: Entity; t: number }> = [];
+  private discRespawn: number[] = [];
+  private discFound = new Set<string>();
+  private discDouble = false;
+  /** Seconds until the structure is judged; 0 when nothing is waiting. */
+  private discTimer = 0;
+  private discQuiet = false;
+  private discResult: Known | null = null;
+  private discUi?: {
+    row: UIElement | null;
+    bondLabel: UIKit.Text | null;
+    restartLabel: UIKit.Text | null;
+    menuButton: UIElement | null;
+    menuLabel: UIKit.Text | null;
+    cardTitle: UIKit.Text | null;
+  };
   /** True when the finished molecule was built in calm mode (no score shown). */
   private completedCalm = false;
   private card?: Object3D;
@@ -415,13 +477,15 @@ export class MoleculeSystem extends createSystem({
     this.setupPanel();
 
     this.bestScores = loadBestScores();
+    this.discFound = new Set(loadDiscovery().found);
     const save = loadProgress();
     const saved = save ? LEVELS.findIndex((l) => l.id === save.levelId) : -1;
     this.startLevel(Math.max(saved, 0), saved >= 0 ? (save ?? undefined) : undefined);
+    if (loadDiscovery().active) this.enterDiscovery();
   }
 
-  /** Clears the current molecule and lays out a level's atoms. */
-  private startLevel(index: number, save?: MoleculeSave): void {
+  /** Removes every atom, bond and running effect from the bench. */
+  private clearScene(): void {
     this.stopCoach();
     for (const bond of Array.from(this.queries.bonds.entities)) bond.dispose();
     this.growing.length = 0;
@@ -432,11 +496,24 @@ export class MoleculeSystem extends createSystem({
       mat?.dispose(); // per-atom clone made in setupAtom
       atom.dispose();
     }
+    this.discNodes.length = 0;
+    this.discBonds.length = 0;
+    this.discSticks.length = 0;
+    this.discDiscards.length = 0;
+    this.discRespawn.length = 0;
+    this.discTimer = 0;
+    this.discResult = null;
     this.teardownInspect();
     this.story.stop();
     this.captionDelay = 0;
     this.pendingReleases.length = 0;
     this.hideHint();
+  }
+
+  /** Clears the current molecule and lays out a level's atoms. */
+  private startLevel(index: number, save?: MoleculeSave): void {
+    if (this.mode === 'discovery') this.leaveDiscovery();
+    this.clearScene();
 
     this.levelIndex = index;
     this.layoutSlots();
@@ -520,6 +597,10 @@ export class MoleculeSystem extends createSystem({
   }
 
   private onGrab(e: Entity): void {
+    if (this.mode === 'discovery') {
+      this.discoveryGrab(e);
+      return;
+    }
     this.stopCoach();
     this.idleTime = 0;
     this.startTimer();
@@ -533,6 +614,7 @@ export class MoleculeSystem extends createSystem({
 
   private onLetGo(e: Entity): void {
     this.setHeldGlow(e, false);
+    if (this.mode === 'discovery') return;
     this.idleTime = 0;
     if (this.introActive && this.introStage === 'place') {
       this.introStage = 'watch';
@@ -590,7 +672,7 @@ export class MoleculeSystem extends createSystem({
       }
     }
     this.lantern?.update(delta);
-    this.updateCoach(delta, inVR);
+    if (this.mode === 'levels') this.updateCoach(delta, inVR);
   }
 
   /**
@@ -772,8 +854,7 @@ export class MoleculeSystem extends createSystem({
     // A grab handle is created once per entity, so switching mode in place
     // would leave the old handle behind. Re-lay the level instead, keeping
     // placements, time and mistakes through the save.
-    this.persistProgress();
-    this.startLevel(this.levelIndex, loadProgress() ?? undefined);
+    this.relayout();
   }
 
   /** A soft glow while an atom is held, so a gaze pick is visibly confirmed. */
@@ -1082,7 +1163,346 @@ export class MoleculeSystem extends createSystem({
     for (const [e, slot] of bySlot) this.place(e, slot, true);
   }
 
+  // --- Discovery mode (free build) ----------------------------------------------------------
+
+  private discGraph(): Graph {
+    return { els: this.discNodes.map((n) => n.el), bonds: this.discBonds };
+  }
+
+  /** Free build: the level on the bench is replaced by three atom dispensers. */
+  private enterDiscovery(): void {
+    this.menuOpen = false;
+    this.settingsOpen = false;
+    if (this.mode === 'discovery') {
+      this.updatePanel();
+      return;
+    }
+    this.mode = 'discovery';
+    const save = loadDiscovery();
+    this.discFound = new Set(save.found);
+    this.discDouble = save.double;
+    this.clearScene();
+    this.buildDiscovery(save.nodes, save.bonds, true);
+    this.persistDiscovery();
+    this.updatePanel();
+  }
+
+  /** Back to the levels; the caller lays a level out. */
+  private leaveDiscovery(): void {
+    this.mode = 'levels';
+    this.persistDiscovery();
+    this.guide.root.visible = true;
+  }
+
+  /** Lays the scene out again (grab mode changed) in whichever mode is active. */
+  private relayout(): void {
+    if (this.mode === 'discovery') {
+      const nodes = this.discNodes.map((n) => [n.el, n.pos.x, n.pos.y] as [ElementSymbol, number, number]);
+      const bonds = this.discBonds.map((b) => [b[0], b[1], b[2]] as [number, number, BondOrder]);
+      this.clearScene();
+      this.buildDiscovery(nodes, bonds, true);
+      this.updatePanel();
+      return;
+    }
+    this.persistProgress();
+    this.startLevel(this.levelIndex, loadProgress() ?? undefined);
+  }
+
+  private buildDiscovery(
+    nodes: Array<[ElementSymbol, number, number]>,
+    bonds: Array<[number, number, BondOrder]>,
+    quiet: boolean,
+  ): void {
+    this.guide.root.visible = false;
+    this.seedRing.visible = false;
+    this.seed = undefined;
+    DISC_DISPENSERS.forEach((_, i) => this.spawnDispenser(i));
+    for (const [el, x, y] of nodes) {
+      const pos = new Vector3(x, y, MOLECULE_Z);
+      const e = this.spawnAtom(el, 200 + this.discNodes.length, -1, pos);
+      this.setGrabbable(e, false);
+      this.discNodes.push({ entity: e, el, pos });
+      this.discSticks.push([]);
+    }
+    for (const [a0, b0, order] of bonds) {
+      const a = Math.min(a0, b0);
+      const b = Math.max(a0, b0);
+      if (a === b || b >= this.discNodes.length) continue;
+      this.discBonds.push([a, b, order]);
+      this.discSticks[b].push(...this.spawnBond(this.discNodes[a].pos, this.discNodes[b].pos, order));
+    }
+    this.discResult = null;
+    this.discTimer = this.discNodes.length > 0 ? 0.4 : 0;
+    this.discQuiet = quiet;
+  }
+
+  private spawnDispenser(i: number): void {
+    const d = DISC_DISPENSERS[i];
+    this.tmp.set(d.x, DISC_TRAY_Y, DISC_TRAY_Z);
+    const e = this.spawnAtom(d.el, 100 + i, -1, this.tmp);
+    if (e.object3D) e.object3D.userData.dispenser = i;
+  }
+
+  private discoveryGrab(e: Entity): void {
+    this.setHeldGlow(e, true);
+    this.sfx.grab(e.getValue(Atom, 'element') as ElementSymbol);
+    const obj = e.object3D;
+    const i = obj?.userData.dispenser as number | undefined;
+    if (obj && i !== undefined) {
+      obj.userData.dispenser = undefined;
+      this.discRespawn.push(i); // a new atom takes its place on the tray
+    }
+  }
+
+  private discoveryRelease(e: Entity): void {
+    const obj = e.object3D;
+    if (!obj || !e.active) return;
+    const el = e.getValue(Atom, 'element') as ElementSymbol;
+    obj.getWorldPosition(this.tmp);
+    const drop = { x: this.tmp.x, y: this.tmp.y };
+    if (this.discNodes.length >= MAX_ATOMS) {
+      this.discoveryRefuse(e, 'That is a big molecule! Use Undo or Clear to make room.');
+      return;
+    }
+    if (this.discNodes.length === 0) {
+      const inFront =
+        Math.abs(this.tmp.z - MOLECULE_Z) <= 0.3 && this.tmp.y >= 0.93 && Math.abs(this.tmp.x) <= 0.5;
+      if (!inFront) {
+        this.discoveryRefuse(e, 'Place the atom in the air in front of you, above the tray.');
+        return;
+      }
+      this.discoveryAdd(e, el, firstPoint(drop), -1, 1);
+      return;
+    }
+    let from = -1;
+    let best = ATTACH_RANGE;
+    this.discNodes.forEach((n, i) => {
+      const d = this.tmp.distanceTo(n.pos);
+      if (d < best) {
+        best = d;
+        from = i;
+      }
+    });
+    if (from < 0) {
+      this.discoveryRefuse(e, 'Bring the atom right next to an atom of your molecule.');
+      return;
+    }
+    const order: BondOrder = this.discDouble ? 2 : 1;
+    const room = freeValence(this.discGraph(), from);
+    if (room < order || VALENCE[el] < order) {
+      this.discoveryRefuse(
+        e,
+        order === 2 && room >= 1
+          ? 'That atom has room for a single bond only. Switch Bond to Single.'
+          : 'That atom is full: it cannot make another bond.',
+      );
+      return;
+    }
+    const p = attachPoint(
+      this.discNodes[from].pos,
+      drop,
+      this.discNodes.map((n) => n.pos),
+    );
+    if (!p) {
+      this.discoveryRefuse(e, 'No room there. Try another side of the atom.');
+      return;
+    }
+    this.discoveryAdd(e, el, p, from, order);
+  }
+
+  /** The released atom becomes part of the build, bonded to `from` (or the first atom). */
+  private discoveryAdd(
+    e: Entity,
+    el: ElementSymbol,
+    p: { x: number; y: number },
+    from: number,
+    order: BondOrder,
+  ): void {
+    const index = this.discNodes.length;
+    const pos = new Vector3(p.x, p.y, MOLECULE_Z);
+    this.setGrabbable(e, false);
+    this.startTween(e, pos, SNAP_TIME);
+    if (!this.access.reduceMotion) e.setValue(Atom, 'popTime', 0);
+    this.flash(e, true);
+    this.discNodes.push({ entity: e, el, pos });
+    if (from >= 0) {
+      this.discBonds.push([from, index, order]);
+      const lively = !this.access.reduceMotion;
+      this.discSticks.push(this.spawnBond(this.discNodes[from].pos, pos, order, lively));
+      if (lively) {
+        const q = this.discNodes[from].pos;
+        this.emitRing((q.x + pos.x) / 2, (q.y + pos.y) / 2, MOLECULE_Z + 0.045);
+      }
+    } else {
+      this.discSticks.push([]);
+    }
+    this.sfx.snap(Math.min(this.discNodes.length / 10, 1), el);
+    this.discoveryChanged();
+  }
+
+  /** The atom is not taken: a red flash and a hint, then it goes. */
+  private discoveryRefuse(e: Entity, hint: string): void {
+    this.setGrabbable(e, false);
+    this.flash(e, false);
+    this.sfx.error();
+    this.showHint(hint);
+    this.discDiscards.push({ e, t: DISC_REFUSE_TIME });
+  }
+
+  private discardAtom(e: Entity): void {
+    if (!e.active) return;
+    const mat = e.object3D ? this.atomMaterial(e.object3D) : undefined;
+    mat?.dispose();
+    e.dispose();
+  }
+
+  private removeLastNode(): void {
+    const index = this.discNodes.length - 1;
+    for (const stick of this.discSticks[index] ?? []) if (stick.active) stick.dispose();
+    this.discSticks.pop();
+    this.discBonds = this.discBonds.filter((b) => b[1] !== index && b[0] !== index);
+    const node = this.discNodes.pop();
+    if (node) this.discardAtom(node.entity);
+  }
+
+  private discoveryUndo(): void {
+    if (this.mode !== 'discovery' || this.discNodes.length === 0) return;
+    this.removeLastNode();
+    this.sfx.grab('C');
+    this.discoveryChanged();
+  }
+
+  private discoveryClear(): void {
+    if (this.mode !== 'discovery' || this.discNodes.length === 0) return;
+    while (this.discNodes.length > 0) this.removeLastNode();
+    this.discoveryChanged();
+  }
+
+  private discoveryToggleDouble(): void {
+    if (this.mode !== 'discovery') return;
+    this.discDouble = !this.discDouble;
+    this.persistDiscovery();
+    this.updatePanel();
+  }
+
+  /** The build changed: wait for stillness, then judge it. */
+  private discoveryChanged(): void {
+    this.discTimer = this.discNodes.length > 0 ? DISC_EVAL_DELAY : 0;
+    this.discQuiet = false;
+    this.discResult = null;
+    this.hideHint();
+    this.persistDiscovery();
+    this.updatePanel();
+  }
+
+  private discoveryEvaluate(): void {
+    const quiet = this.discQuiet;
+    this.discQuiet = false;
+    const known = recognise(this.discGraph());
+    if (known) {
+      const isNew = !this.discFound.has(known.id);
+      this.discFound.add(known.id);
+      this.discResult = known;
+      this.persistDiscovery();
+      if (!quiet) {
+        this.sfx.complete();
+        if (!this.access.reduceMotion) {
+          this.tmp2.set(0, 0, 0);
+          for (const n of this.discNodes) this.tmp2.add(n.pos);
+          this.burst.start(this.tmp2.multiplyScalar(1 / this.discNodes.length));
+        }
+      }
+      this.updatePanel();
+      if (isNew && !quiet) {
+        this.showHint(`New discovery! ${this.discFound.size} of ${KNOWN_COUNT} found.`);
+      }
+    } else if (this.discNodes.length >= 2) {
+      this.showHint(TEXT_DISC_UNKNOWN);
+    }
+  }
+
+  private updateDiscovery(delta: number): void {
+    while (this.discRespawn.length > 0) this.spawnDispenser(this.discRespawn.pop() as number);
+    for (let i = this.discDiscards.length - 1; i >= 0; i--) {
+      const item = this.discDiscards[i];
+      item.t -= delta;
+      if (item.t <= 0) {
+        this.discardAtom(item.e);
+        this.discDiscards.splice(i, 1);
+      }
+    }
+    if (this.discTimer > 0 && this.queries.held.entities.size === 0) {
+      this.discTimer -= delta;
+      if (this.discTimer <= 0) this.discoveryEvaluate();
+    }
+  }
+
+  private persistDiscovery(): void {
+    saveDiscovery({
+      active: this.mode === 'discovery',
+      found: Array.from(this.discFound),
+      nodes: this.discNodes.map((n) => [n.el, n.pos.x, n.pos.y] as [ElementSymbol, number, number]),
+      bonds: this.discBonds.map((b) => [b[0], b[1], b[2]] as [number, number, BondOrder]),
+      double: this.discDouble,
+    });
+  }
+
+  private discoveryInstruction(): string {
+    const gaze = this.gazeActive;
+    const reach = !gaze && this.access.reach;
+    if (this.discNodes.length === 0) {
+      return gaze ? TEXT_DISC_EMPTY_GAZE : reach ? TEXT_DISC_EMPTY_REACH : TEXT_DISC_EMPTY;
+    }
+    return gaze ? TEXT_DISC_BUILD_GAZE : reach ? TEXT_DISC_BUILD_REACH : TEXT_DISC_BUILD;
+  }
+
+  private updateDiscoveryPanel(): void {
+    const ui = this.ui;
+    if (!ui) return;
+    const found = this.discResult;
+    ui.levelName.setProperties({
+      text: this.settingsOpen ? 'Settings' : this.menuOpen ? 'Choose a molecule' : 'Discovery mode',
+    });
+    const playing = !this.settingsOpen && !this.menuOpen;
+    this.settingsUi?.playPage?.setProperties({ display: playing ? 'flex' : 'none' });
+    this.settingsUi?.settingsPage?.setProperties({ display: this.settingsOpen ? 'flex' : 'none' });
+    this.settingsUi?.menuPage?.setProperties({ display: this.menuOpen ? 'flex' : 'none' });
+    this.refreshSettings();
+    this.refreshMenu();
+    ui.progress.setProperties({
+      text: found
+        ? `${found.name}!`
+        : `Atoms: ${this.discNodes.length}   Bonds: ${this.discBonds.length}`,
+    });
+    ui.header.setProperties({ backgroundColor: found ? '#9fe0b8' : '#dcebe8' });
+    ui.instructions.setProperties({
+      display: found ? 'none' : 'flex',
+      text: this.discoveryInstruction(),
+      fontSize: 20,
+      fontWeight: 400,
+      color: '#2b2b2b',
+    });
+    ui.formulaImg?.setProperties({ display: 'none' });
+    ui.allDone.setProperties({ display: 'none' });
+    ui.next?.setProperties({ display: 'none' });
+    ui.playAgain?.setProperties({ display: 'none' });
+    this.discUi?.row?.setProperties({ display: 'flex' });
+    this.discUi?.restartLabel?.setProperties({ text: 'Clear' });
+    this.discUi?.bondLabel?.setProperties({ text: this.discDouble ? 'Bond: Double' : 'Bond: Single' });
+    // The fact goes on the card on the left, like a finished level's fact.
+    const inVR = this.world.visibilityState.peek() !== VisibilityState.NonImmersive;
+    if (this.card) this.card.visible = !!found && inVR;
+    const card = this.cardUi;
+    if (card) {
+      card.factText?.setProperties({ text: found ? found.fact : '' });
+      card.scoreBox?.setProperties({ display: 'none' });
+      card.calmText?.setProperties({ display: 'none' });
+    }
+    this.discUi?.cardTitle?.setProperties({ text: found ? `You found: ${found.name}!` : 'Did you know?' });
+  }
+
   private persistProgress(): void {
+    if (this.mode === 'discovery') return;
     const save: MoleculeSave = {
       levelId: this.level.id,
       placements: {},
@@ -1170,9 +1590,24 @@ export class MoleculeSystem extends createSystem({
       toggles,
     };
 
+    const infoCard = this.world.getSceneObject<UIKitMLAsset>('info-card');
+    this.discUi = {
+      row: panel.getElementById('row-discovery'),
+      bondLabel: panel.getElementById<UIKit.Text>('bond-label'),
+      restartLabel: panel.getElementById<UIKit.Text>('restart-label'),
+      menuButton: panel.getElementById('discovery-button'),
+      menuLabel: panel.getElementById<UIKit.Text>('discovery-label'),
+      cardTitle: infoCard?.getElementById<UIKit.Text>('card-title') ?? null,
+    };
+
     const bind = (id: string, onActivate: () => void) =>
       this.bindButton(panel.getElementById(id), id, onActivate);
-    bind('restart-button', () => this.startLevel(this.levelIndex));
+    bind('restart-button', () =>
+      this.mode === 'discovery' ? this.discoveryClear() : this.startLevel(this.levelIndex),
+    );
+    bind('undo-button', () => this.discoveryUndo());
+    bind('bond-button', () => this.discoveryToggleDouble());
+    bind('discovery-button', () => this.enterDiscovery());
     bind('settings-button', () => this.setSettingsOpen(true));
     bind('back-button', () => this.setSettingsOpen(false));
     bind('molecules-button', () => this.setMenuOpen(true));
@@ -1276,7 +1711,7 @@ export class MoleculeSystem extends createSystem({
   /** Picks a molecule from the menu; a different one starts from its saved progress, if any. */
   private chooseLevel(index: number): void {
     this.menuOpen = false;
-    if (index !== this.levelIndex) {
+    if (index !== this.levelIndex || this.mode === 'discovery') {
       this.startLevel(index, this.savedFor(LEVELS[index].id));
       this.persistProgress();
     }
@@ -1301,6 +1736,14 @@ export class MoleculeSystem extends createSystem({
   private refreshMenu(): void {
     const ui = this.settingsUi;
     if (!ui) return;
+    const inDiscovery = this.mode === 'discovery';
+    this.discUi?.menuLabel?.setProperties({
+      text: `Discovery mode: ${this.discFound.size} of ${KNOWN_COUNT} found`,
+      fontSize: 19,
+      fontWeight: inDiscovery ? 700 : 400,
+      color: inDiscovery ? '#102a1c' : '#ffffff',
+    });
+    this.discUi?.menuButton?.setProperties({ backgroundColor: inDiscovery ? '#f2d98a' : '#2b3036' });
     ui.chButtons.forEach((c, i) => {
       const open = i === this.menuChapter;
       c.label?.setProperties({
@@ -1314,7 +1757,7 @@ export class MoleculeSystem extends createSystem({
     const start = chapterStart(this.menuChapter);
     ui.molButtons.forEach((m, j) => {
       const level = LEVELS[start + j];
-      const current = start + j === this.levelIndex;
+      const current = this.mode === 'levels' && start + j === this.levelIndex;
       const built = this.cabinet.has(level.id);
       m.label?.setProperties({
         text: level.name,
@@ -1361,8 +1804,7 @@ export class MoleculeSystem extends createSystem({
     if (this.access.calm !== before.calm) this.idleTime = 0;
     if (this.access.reach !== before.reach) {
       // The grab handle is made once per atom, so lay the level out again.
-      this.persistProgress();
-      this.startLevel(this.levelIndex, loadProgress() ?? undefined);
+      this.relayout();
       return;
     }
     this.updatePanel();
@@ -1413,6 +1855,10 @@ export class MoleculeSystem extends createSystem({
 
   private updatePanel(): void {
     if (!this.ui) return;
+    if (this.mode === 'discovery') {
+      this.updateDiscoveryPanel();
+      return;
+    }
     const total = this.level.bonds.length;
     const done = this.bondsDone === total;
     const hasNext = this.levelIndex < LEVELS.length - 1;
@@ -1430,6 +1876,9 @@ export class MoleculeSystem extends createSystem({
     this.settingsUi?.menuPage?.setProperties({ display: this.menuOpen ? 'flex' : 'none' });
     this.refreshSettings();
     this.refreshMenu();
+    this.discUi?.row?.setProperties({ display: 'none' });
+    this.discUi?.restartLabel?.setProperties({ text: 'Build again' });
+    this.discUi?.cardTitle?.setProperties({ text: 'Did you know?' });
     this.ui.progress.setProperties({
       text: done
         ? `${this.level.name} complete!`
@@ -1515,9 +1964,10 @@ export class MoleculeSystem extends createSystem({
     this.updateIntro(delta);
     this.formula.tick(delta);
     this.cabinet.update(delta);
-    this.updateInspect(delta);
+    if (this.mode === 'levels') this.updateInspect(delta);
     this.story.update(delta);
     if (
+      this.mode === 'levels' &&
       this.timerStarted &&
       !this.access.calm &&
       !this.isComplete() &&
@@ -1526,7 +1976,7 @@ export class MoleculeSystem extends createSystem({
       this.elapsed += delta;
     }
 
-    this.updateSeedCue(delta);
+    if (this.mode === 'levels') this.updateSeedCue(delta);
 
     if (this.captionDelay > 0) {
       this.captionDelay -= delta;
@@ -1544,6 +1994,8 @@ export class MoleculeSystem extends createSystem({
         if (inspectNext) this.showHint(this.farGrab ? TEXT_INSPECT_FAR : TEXT_INSPECT);
       }
     }
+
+    if (this.mode === 'discovery') this.updateDiscovery(delta);
 
     for (const e of this.queries.atoms.entities) {
       const obj = e.object3D;
@@ -1612,6 +2064,10 @@ export class MoleculeSystem extends createSystem({
   }
 
   private onRelease(e: Entity): void {
+    if (this.mode === 'discovery') {
+      this.discoveryRelease(e);
+      return;
+    }
     const obj = e.object3D;
     if (!obj || (e.getValue(Atom, 'slot') ?? -1) >= 0) return;
     const element = e.getValue(Atom, 'element');
@@ -1760,6 +2216,10 @@ export class MoleculeSystem extends createSystem({
 
   /** Quietly sends a free atom home, e.g. when play is paused mid-grab. */
   private setAside(e: Entity): void {
+    if (this.mode === 'discovery') {
+      this.discardAtom(e);
+      return;
+    }
     if ((e.getValue(Atom, 'slot') ?? -1) >= 0) return;
     this.idleTime = 0;
     this.returnHome(e);
@@ -1805,7 +2265,8 @@ export class MoleculeSystem extends createSystem({
     }
   }
 
-  private spawnBond(a: Vector3, b: Vector3, order: 1 | 2, animate = false): void {
+  private spawnBond(a: Vector3, b: Vector3, order: 1 | 2, animate = false): Entity[] {
+    const created: Entity[] = [];
     const dir = new Vector3().subVectors(b, a);
     const length = dir.length();
     dir.normalize();
@@ -1835,8 +2296,11 @@ export class MoleculeSystem extends createSystem({
           t: -STICK_DELAY,
         });
       }
-      this.world.createTransformEntity(stick).addComponent(Bond);
+      const entity = this.world.createTransformEntity(stick);
+      entity.addComponent(Bond);
+      created.push(entity);
     }
+    return created;
   }
 
   private startTween(e: Entity, to: Vector3, duration: number): void {

@@ -44,8 +44,8 @@ These apply to every phase. A feature that breaks one of them is not done.
 | 11 | Story moments: caffeine into a coffee cup, aspirin on a willow leaf, paracetamol into a tablet | done |
 | 12 | Optional: more molecules (ibuprofen, vitamin C, vanillin) with a selection menu | done |
 | 13 | Chapters on the Molecules menu and three new molecules (glucose, menthol, cinnamaldehyde) | done |
-| 14 | Discovery mode: free build, the game recognises what you built and shows a fun fact | next |
-| 15 | Real Quest test, demo video under 3 minutes, Devpost submission form | planned |
+| 14 | Discovery mode: free build, the game recognises what you built and shows a fun fact | done |
+| 15 | Real Quest test, demo video under 3 minutes, Devpost submission form | next |
 
 ### Phase details
 
@@ -243,9 +243,48 @@ These apply to every phase. A feature that breaks one of them is not done.
    (too wide), and shrunk to fit (0.42 m tall) its atoms nearly touch, its top atoms are
    about 0.65 m from a seated hand and it needs a third tray row. The three newest levels have
    no story scene yet.
-14. **Discovery mode** — planned: free build, recognition of 18 molecules (nine small ones and
-   the nine levels), see the review file for the texts. Feature freeze November 4; dropped if
-   not stable by about November 6.
+14. **Discovery mode** — free build: the Molecules menu has a "Discovery mode: n of 18 found"
+   button. The bench then shows three dispensers (C, N, O) with unlimited atoms; pinch one and
+   place it in the air in front of you (the first atom is kept in the middle of the build
+   area), then bring more atoms next to it. A release within 14 cm of an atom bonds there:
+   the new atom sits one bond length (9.5 cm) away in the free direction (every 30 degrees)
+   closest to where it was dropped, and nothing overlaps. A **Bond: Single / Double** button
+   makes the next bonds single or double; valence is enforced (C 4, N 3, O 2), a refused atom
+   flashes red and goes with a hint, **Undo** removes the last atom and **Clear** everything.
+   Atoms are heavy atoms only (hydrogens implied) and, like placed level atoms, cannot be
+   moved once placed (use Undo). After 1.2 s of stillness the game names the structure:
+   the sparks, chime and a card on the left ("You found: Water!" with the approved fun fact),
+   a hint "New discovery! n of 18 found." the first time, or "Not a known molecule yet, try
+   again" for two or more atoms that match nothing. It recognises the 18 molecules in the
+   review file: nine small ones (methane, ammonia, water, oxygen, carbon dioxide, ethene,
+   acetic acid, urea, benzene) and the nine levels, in any arrangement and either way of
+   drawing a benzene ring's double bonds. Left out on purpose: ethanol and every other alcohol
+   drink or fuel (so ethanol, methanol and the like show the "not known" message), nitrogen
+   gas and carbon monoxide (they need triple bonds). The build, the Bond toggle, the found
+   list and the mode are saved (`molecule-lab:discovery:v1`), so leaving VR, a pause or a
+   reload keeps them; the level progress save is not touched while in Discovery. Code:
+   `src/discovery.ts` (recognition, rules, placement, saving; no engine imports) and a
+   Discovery section in `molecule-system.ts`. Accessibility: the same grab modes (Reach assist
+   and gaze give distance grab), Reduce motion (no rings, pop, sparks or bond animation), Calm
+   mode (nothing is timed or scored anyway), table distance and height, one-hand play and the
+   per-element sounds all apply. Tested by script (esbuild bundle in node): all 18 molecules
+   recognise themselves in 25 random atom and bond orders each, the other benzene drawing
+   matches, 10 non-molecules (methanol, ethanol, propane, cyclohexane, formaldehyde, peroxide
+   and others) and every level molecule with one atom missing are unknown, no two known
+   molecules are the same graph. Verified in the emulator with real input: ray clicks opened the
+   menu, started Discovery, switched Bond to Double and pressed Undo; real hand pinches
+   (grab, move, release) placed one oxygen (named Water, card shown), then O, C, O with double
+   bonds (named Carbon dioxide); Undo left a C=O that gave the "not known" hint; a nitrogen
+   dropped on the full oxygen was refused with "That atom is full"; a reload restored the
+   build and the mode; a ray click on a level returned to the levels with the guide, formula
+   and tray intact, and the console was clean. With real clicks, Settings opened inside Discovery and
+   Reach assist switched on: the three dispensers were laid out again with distance-grab handles
+   (none with near grab) and no errors (a real distance grab was not tried). Not verified: Reduce
+   motion, Calm mode and gaze inside Discovery, finger poke on the new buttons, the look and reach on a
+   headset (the build area is the same plane as the molecules, y 0.98 to 1.42 m, so its top
+   is as far as the levels' molecules), and the other small molecules by hand (the script
+   covers their recognition). The Molecules menu page is now 469 units high (454 for the play
+   page), about 1.5 cm taller than before.
 15. **Submission** — real Quest test, demo video under 3 minutes, Devpost form.
 
 **Story moments for the new molecules** (addendum to phases 11 and 12, approved by the user

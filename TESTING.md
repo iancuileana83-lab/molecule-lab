@@ -88,6 +88,23 @@ Paracetamol, aspirin, caffeine, ibuprofen, vitamin C, vanillin (Molecules button
 - [ ] Each shows its fact on the card, and the stars and time are sensible.
 - [ ] A full session of the first three molecules takes under 10 minutes. Time: ____
 
+## 7b. Discovery mode
+Molecules menu, Discovery mode button.
+
+- [ ] Pinch an oxygen from the tray and place it in the air in front of you: after about a
+      second the card on the left says "You found: Water!". Same for one carbon (methane) and
+      one nitrogen (ammonia).
+- [ ] Set Bond to Double, build O=C=O: "Carbon dioxide". Build C=C: "Ethene". With Bond Single
+      build a C-C, then add C: "Not a known molecule yet, try again".
+- [ ] Put a third atom on an atom that is full: a red flash and "That atom is full".
+- [ ] Undo and Clear work with a pinch; the Bond button changes between Single and Double.
+- [ ] Reach assist on (Settings): the three dispensers can be picked up from a distance.
+- [ ] Leave VR in the middle of a build and come back: the build is still there.
+- [ ] The "Discovered n of 18" counter on the menu goes up with each new molecule, and a
+      reload keeps it.
+- [ ] Finger press (poke) on Undo, Bond and Clear: each fires once.
+- [ ] The tray, the build area and the panel are all within easy reach when seated.
+
 ## 8. Meta VR Glasses (only if available)
 
 - [ ] Look at an atom and pinch: the atom you look at is the one that is picked up.
