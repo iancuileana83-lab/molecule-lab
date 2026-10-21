@@ -227,7 +227,11 @@ top out at 0.917 m (ibuprofen, the tallest), so the earlier ceiling of 0.92 m an
 results still hold. Verified in the emulator by stepping the paused ECS: all three scenes show,
 the longest caption fits the panel (four lines). Not verified end to end: a real completion of
 the three molecules with the caption (the scene and the caption were tested separately), and
-the look from a real headset.
+the look from a real headset. Later the three scenes were completed end to end in the emulator
+(every atom placed through the game's own placement code, not by pinch): scene and caption
+appeared for each. Font check: the panel font draws "ö" (Szent-Györgyi) but not "é", which showed
+as a black square, so the vanillin fact now reads "Nicolas-Theodore Gobley". Keep new texts to
+ASCII plus "ö" unless the glyph is checked on the card first.
 
 ## Already built (before the numbered phases)
 

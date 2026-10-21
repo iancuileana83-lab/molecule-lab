@@ -414,7 +414,8 @@ export class MoleculeSystem extends createSystem({
     this.bestScores = loadBestScores();
     const save = loadProgress();
     const saved = save ? LEVELS.findIndex((l) => l.id === save.levelId) : -1;
-    this.startLevel(Math.max(saved, 0), saved >= 0 ? (save ?? undefined) : undefined);  }
+    this.startLevel(Math.max(saved, 0), saved >= 0 ? (save ?? undefined) : undefined);
+  }
 
   /** Clears the current molecule and lays out a level's atoms. */
   private startLevel(index: number, save?: MoleculeSave): void {
